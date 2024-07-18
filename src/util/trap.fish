@@ -1,5 +1,3 @@
-#!/usr/bin/env fish
-
 function arm -a victim -d "Arm a non-zero exit code trap for the provided executable."
     # This function remains in scope, even after 'trap' ends.
     function $victim -V victim -w $victim
@@ -35,7 +33,7 @@ function arm -a victim -d "Arm a non-zero exit code trap for the provided execut
             end
 
             # Print backtrace, if enabled.
-            if [ -n "$fish_backtrace" ]
+            if [ -n "$fish_trace" ]
                 echo -n (set_color normal)
                 printf "\n--- BACKTRACE ---\n"
                 status stack-trace
@@ -45,6 +43,7 @@ function arm -a victim -d "Arm a non-zero exit code trap for the provided execut
             # Otherwise, just return the code.
             if not status is-interactive
                 printf "\n%s: aborting\n" (status basename | string split '.')[1]
+                printf "%s" (set_color normal)
                 exit $stat
             else
                 return $stat

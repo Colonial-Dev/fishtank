@@ -4,7 +4,7 @@
 <p align="center">
 <img src="https://img.shields.io/github/license/Colonial-Dev/fishtank">
 <img src="https://img.shields.io/github/stars/Colonial-Dev/fishtank">
-</p>⏎
+</p>
 
 ## Features
 
@@ -14,7 +14,6 @@ Before installing, make sure you have the following:
 - `fish`
 - `podman`
 - `coreutils`
-- `gzip`
 
 ## Getting Started
 
