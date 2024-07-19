@@ -1,0 +1,17 @@
+name: Fish Comprehensive
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  linting:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Fish
+      run: sudo apt install fish
+    - name: Lint
+      run: make lint

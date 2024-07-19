@@ -1,7 +1,14 @@
+# Auto-format all source files (using fish_indent)
+# and add any missing trailing newlines.
 format:
 	for file in $$(find src/ -name "*.fish"); do \
-		sed -i '$$a\' $$file; \
-		fish_indent -w $$file;   \
+		fish_indent -w $$file; \
+	done
+
+lint:
+	@set -e
+	@for file in $$(find src/ -name "*.fish"); do \
+		fish_indent -c $$file; \
 	done
 
 build:
