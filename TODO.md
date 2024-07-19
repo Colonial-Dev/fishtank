@@ -11,7 +11,6 @@
     - With `--link-to <name>`, rather than creating a new file, a symbolic link is created to the existing definition specified by `--link-to`. 
 - Exec (container, command)
 - Enter (container)
-- Try (container, command)
 - Install
     - Used for self-installation and update via `curl`, plus injecting certain extra functionality (such as an autostart `systemd` unit.)
 

@@ -5,7 +5,7 @@ function arm -a victim -d "Arm a non-zero exit code trap for the provided execut
         # to avoid splitting into a list.
         set -l output "$(command $victim $argv 2>&1)"
         # Capture the status.
-        set -l stat   $status
+        set -l stat $status
 
         # If the status is not zero, we've trapped an error.
         if [ "$stat" -ne 0 ]
@@ -23,7 +23,7 @@ function arm -a victim -d "Arm a non-zero exit code trap for the provided execut
 
             # Write out the output (pretty-formatted) if any exists.
             if [ -z "$output" ]
-                printf "(no output)\n" 
+                printf "(no output)\n"
             else
                 printf "%s\n" $output[1]
 
@@ -48,8 +48,8 @@ function arm -a victim -d "Arm a non-zero exit code trap for the provided execut
             else
                 return $stat
             end
-        # If the status is zero, all is well. Print the captured output and return.
         else
+            # If the status is zero, all is well. Print the captured output and return.
             printf "%s" "$(echo $output)"
         end
     end
