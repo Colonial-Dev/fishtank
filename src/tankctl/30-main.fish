@@ -1,55 +1,17 @@
 function ft_help
-    printf "Good luck!\n"
-end
+    set -l nrm (set_color normal)
+    set -l uln (set_color -ou)
+    set -l bld (set_color -o)
 
-function ctr_started -a ctr
-    set -l status (podman inspect $ctr --format "{{ .State.Status }}")
+    printf "An interactive container manager for the fish shell."
+    printf "\n\n"
 
-    if [ "$status" != running ]
-        return 1
-    else
-        return 0
-    end
-end
+    printf "%sUsage:%s " $uln $nrm
+    printf "%s%s%s <COMMAND>" $bld (status basename | string split '.')[1] $nrm
+    printf "\n\n"
 
-function ctr_annotation -a ctr key
-    echo (podman inspect $ctr --format "{{index .Config.Annotations \"$key\"}}")
-end
-
-# Enumerate all containers (stopped or otherwise) managed by Fishtank.
-function enumerate_ctrs
-    for id in (podman ps -a --format "{{.ID}}")
-        # The 'manager' annotation is not standardized, but distrobox uses it,
-        # which is good enough for me.
-        set -l manager (ctr_annotation $id "manager")
-
-        # fish splits on newlines by default, so directly echoing
-        # the container IDs means that callers will automatically
-        # capture the output as a list.
-        if [ "$manager" == $FT_MANAGER ]
-            echo $id
-        end
-    end
-end
-
-function check_ctr -a ctr
-    # 'command' bypasses the exit code trap set during script initialization.
-    if not command podman container exists $ctr
-        abort "container '$ctr' does not exist\n"
-    end
-
-    if [ (ctr_annotation $ctr "manager") != $FT_MANAGER ]
-        # TODO: ask for user confirmation instead
-        abort "container '$ctr' is not managed by fishtank\n"
-    end
-end
-
-function ft_up
-
-end
-
-function ft_down
-
+    printf "%sCommands:%s\n" $uln $nrm
+    printf "\n\n"
 end
 
 # Start one or more specified container(s),
@@ -92,6 +54,9 @@ function ft_stop
             podman stop -t 0 $id
         end
     end
+end
+
+function ft_rm
 end
 
 function ft_list
@@ -141,10 +106,10 @@ mkdir -p $tank_dir
 
 if [ -z "$argv[1]" ]
     ft_help
-    abort "no subcommand specified\n"
+    abort "no subcommand specified"
 else if not functions -q "ft_$argv[1]"
     ft_help
-    abort "unknown subcommand '$argv[1]'\n"
+    abort "unknown subcommand '$argv[1]'"
 else
     eval (ft_$argv[1] $argv[2..])
 end

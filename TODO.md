@@ -1,6 +1,4 @@
 ### Commands:
-- Up (recreate, rebuild)
-- Down 
 - Start
 - Restart
 - Stop
@@ -14,7 +12,7 @@
 - Install
     - Used for self-installation and update via `curl`, plus injecting certain extra functionality (such as an autostart `systemd` unit.)
 
-1. Where applicable, commands operate on all tanks by default, and can be provided a list of tank(s) to operate on specifically.
+1. Where applicable, commands can take a list of one or more containers to operate on, or use an `--all` switch to operate on all managed containers.
 2. Fishtank identifies containers by looking for the annotation `manager=fishtank`. 
     - (This is not exactly standard, but `distrobox` does it, which is good enough for me.)
 3. 
@@ -56,3 +54,6 @@ The first instance of a directive is always the one used. Later instances, if an
 ```shell
 Name          Image          Status          Up to Date?
 ```
+
+### Unit Tests
+Somehow.
