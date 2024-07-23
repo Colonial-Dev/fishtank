@@ -14,4 +14,6 @@ jobs:
     - name: Install Fish
       run: sudo apt install fish
     - name: Lint
-      run: ./make lint
+      run: ./do lint
+    - name: Build
+      run: ./do build

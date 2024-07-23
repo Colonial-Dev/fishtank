@@ -43,11 +43,11 @@ curl --proto '=https' --tlsv1.2 -sSf $URL | source - install self /usr/bin
 ```
 
 ### From Source
-If you are allergic to `curl | exec`, "building" Fishtank from source is also possible.
+If you are allergic to `curl | exec`, "building" Fishtank from source using the bundled `do` script is also possible.
 
 ```sh
 git clone https://github.com/Colonial-Dev/fishtank && cd fishtank
-make build
+./do build
 cp target/* $HOME/.local/bin
 ```
 

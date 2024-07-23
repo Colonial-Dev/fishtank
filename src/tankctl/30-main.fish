@@ -1,79 +1,70 @@
-function ft_help
-    set -l nrm (set_color normal)
-    set -l uln (set_color -ou)
-    set -l bld (set_color -o)
-
-    printf "An interactive container manager for the fish shell."
-    printf "\n\n"
-
-    printf "%sUsage:%s " $uln $nrm
-    printf "%s%s%s <COMMAND>" $bld (status basename | string split '.')[1] $nrm
-    printf "\n\n"
-
-    printf "%sCommands:%s\n" $uln $nrm
-    printf "\n\n"
-end
-
 # Start one or more specified container(s),
 # or all Fishtank-managed containers if no arguments are provided.
-function ft_start
+function tankctl_start
+    for_each check_ctr $argv
+
     if [ (count $argv) -ne 0 ]
-        for name in $argv
-            podman start $id
-        end
+        map start_ctr $argv
     else
-        for id in (enumerate_containers)
-            podman start $id
-        end
+        map start_ctr (enumerate_containers)
     end
 end
 
 # Restart one or more specified container(s),
 # or all Fishtank-managed containers if no arguments are provided.
-function ft_restart
+function tankctl_restart
+    for_each check_ctr $argv
+
     if [ (count $argv) -ne 0 ]
-        for name in $argv
-            podman restart -t 0 $id
-        end
+        map restart_ctr $argv
     else
-        for id in (enumerate_containers)
-            podman restart -t 0 $id
-        end
+        map restart_ctr (enumerate_containers)
     end
 end
 
 # Stop one or more specified container(s),
 # or all Fishtank-managed containers if no arguments are provided.
-function ft_stop
+function tankctl_stop
+    for_each check_ctr $argv
+
     if [ (count $argv) -ne 0 ]
-        for name in $argv
-            podman stop -t 0 $id
-        end
+        map stop_ctr $argv
     else
-        for id in (enumerate_containers)
-            podman stop -t 0 $id
-        end
+        map stop_ctr (enumerate_containers)
     end
 end
 
-function ft_rm
+# Remove one or more specified container(s).
+function tankctl_down
+    for_each check_ctr $argv
+
+    if [ (count $argv) -eq 0 ]
+        abort "no container names or IDs provided"
+    end
+
+    map rm_ctr $argv
 end
 
-function ft_list
+# Create one or more specified containers from their respective images.
+function tankctl_up
 
 end
 
-function ft_build
+function tankctl_list
 
 end
 
-function ft_create
+function tankctl_edit
+
+end
+
+function tankctl_create
 
 end
 
 # Attempts to execute the provided command inside
 # the specified container.
-function ft_exec -a container command
+function tankctl_exec -a container command
     # Check if provided container exists
     # Check if we manage it, warn and ask for confirmation otherwise
     # Start if needed
@@ -83,7 +74,7 @@ end
 #
 # Note that the value of $SHELL *inside* the container is used,
 # *not* the value on the host.
-function ft_enter -a container
+function tankctl_enter -a container
     # Check if provided container exists
     # Check if we manage it, warn and ask for confirmation otherwise
     # Start if needed
@@ -94,22 +85,23 @@ end
 
 require podman
 
-trap rm cp mv ls mkdir podman
+trap rm cp mv ls ln mkdir podman
+trap curl realpath find md5sum fish
 
 if [ -n "$XDG_CONFIG_HOME" ]
-    set -x tank_dir "$XDG_CONFIG_HOME/fishtank"
+    set -x __TANK_DIR "$XDG_CONFIG_HOME/fishtank"
 else
-    set -x tank_dir "$HOME/.config/fishtank"
+    set -x __TANK_DIR "$HOME/.config/fishtank"
 end
 
-mkdir -p $tank_dir
+mkdir -p $__TANK_DIR
 
 if [ -z "$argv[1]" ]
-    ft_help
+    tankctl_help
     abort "no subcommand specified"
-else if not functions -q "ft_$argv[1]"
-    ft_help
+else if not functions -q "tankctl_$argv[1]"
+    tankctl_help
     abort "unknown subcommand '$argv[1]'"
 else
-    eval (ft_$argv[1] $argv[2..])
+    tankctl_$argv[1] $argv[2..]
 end
