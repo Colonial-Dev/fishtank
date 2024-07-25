@@ -50,15 +50,14 @@ function filter_unchanged
 end
 
 function do_build -a def
-    eprintf "%s" (set_color brgreen)
-    eprintf "starting build for image $(basename -s .tank $def)...\n"
-    eprintf "%s" (set_color normal)
-
     set -l def (realpath $def)
+
+    vprintf "['%s'] Starting build..." "$def"
 
     # Parse any directives in the file.
     # (Unknown directives are not an error; they are simply ignored.)
     for match in (grep -o "^# fishtank [a-z-]*" $def)
+        vprintf "['%s'] found directive %s" "$def" "$match"
         set __(echo $match | sed 's/# fishtank //') yes
     end
 
@@ -66,6 +65,7 @@ function do_build -a def
 
     if [ -n "$__containerfile" ]
         set -l name (basename -s .tank $def)
+        vprintf "['%s'] Containerfile directive set" "$def"
 
         set -a invoke build \
             --pull=newer \
@@ -112,10 +112,6 @@ function do_build -a def
         end
 
         set -a invoke $def
-
-        eprintf "%s" (set_color brgreen)
-        eprintf "build for image $(basename -s .tank $def) complete!\n"
-        eprintf "%s" (set_color normal)
     end
 
 
@@ -124,6 +120,8 @@ function do_build -a def
     else
         $invoke
     end
+
+    vprintf "['%s'] Build complete!" "$def"
 end
 
 function tankctl_build

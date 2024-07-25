@@ -6,6 +6,17 @@ function build
     rm -f target/tankctl
     rm -f target/tankcfg
 
+    for file in (find src/ -name "*.fish")
+        if not fish -n $file
+            set -x failure true
+        end
+    end
+
+    if [ "$failure" = true ]
+        echo "do: syntax errors detected, refusing to build!"
+        exit 1
+    end
+
     cat src/common/* src/tankctl/* >> target/tankctl
     cat src/common/* src/tankcfg/* >> target/tankcfg
     
@@ -14,12 +25,6 @@ function build
 end
 
 function lint
-    function scan
-        for path in (find src/ -name "*.fish")
-            grep -o "^function [a-z1-9_]*" $path
-        end
-    end
-
     for file in (find src/ -name "*.fish")
         if not fish_indent -c $file
             set -x failure true
@@ -30,7 +35,7 @@ function lint
         exit 1
     end
 
-    set -l uniq (scan | sort | uniq -d)
+    set -l uniq (find src/ -name "*.fish" | xargs grep -ho "^function [a-z1-9_]*" | sort | uniq -d)
 
     if [ (count $uniq) -ne 0 ]
         scan | sort | uniq -d
