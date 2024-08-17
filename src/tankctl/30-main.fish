@@ -86,7 +86,7 @@ end
 require podman
 require buildah
 
-trap rm cp mv ls ln mkdir podman buildah
+trap rm cp mv ls ln mkdir podman
 trap curl realpath find md5sum fish
 
 if [ -n "$XDG_CONFIG_HOME" ]

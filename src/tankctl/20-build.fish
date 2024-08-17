@@ -80,13 +80,14 @@ function do_build -a def
             chmod +x $def
         end
 
+        # TODO: add error checking to buildah wrapper
         set -a invoke fish \
             -C "
                 # Change working directory to that of the definition file
                 cd $(dirname $def)
                 # Set flag for tankcfg to check
                 set -l __FISHTANK_IN_BUILD yes
-
+            
                 function buildah
                     if [ \$argv[1] = 'from' ]
                         set -l ctr (command buildah \$argv)
@@ -98,7 +99,9 @@ function do_build -a def
                             -a fishtank.name=$name \
                             \$ctr
 
-                        tankcfg wrap \$ctr
+                        set -x __FISHTANK_BUILD_CTR \$ctr
+
+                        tankcfg wrap
 
                         echo \$ctr
                     else

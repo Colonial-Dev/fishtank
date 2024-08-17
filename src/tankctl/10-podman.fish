@@ -46,12 +46,12 @@ end
 
 # Look up, by key, an annotation on the provided container.
 function ctr_annotation -a ctr key
-    echo (podman inspect -t container $ctr --format "{{index .Config.Annotations \"$key\"}}")
+    podman inspect -t container $ctr --format "{{index .Config.Annotations \"$key\"}}"
 end
 
 # Look up, by key, an annotation on the provided image.
 function img_annotation -a img key
-    echo (podman inspect -t image $img --format "{{index .Annotations \"$key\"}}")
+    podman inspect -t image $img --format "{{index .Annotations \"$key\"}}"
 end
 
 # Check that the provided container exists, aborting if it does not.
