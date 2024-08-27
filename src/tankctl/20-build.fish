@@ -92,7 +92,7 @@ function do_build -a def
                     if [ \$argv[1] = 'from' ]
                         set -l ctr (command buildah \$argv)
                         
-                        command buildah config \
+                        buildah config \
                             -a manager=fishtank \
                             -a fishtank.path=$def \
                             -a fishtank.hash=$(md5 $def) \
@@ -101,12 +101,54 @@ function do_build -a def
 
                         set -x __FISHTANK_BUILD_CTR \$ctr
 
-                        tankcfg wrap
-
                         echo \$ctr
                     else
                         command buildah \$argv
                     end
+                end
+
+                function RUN
+                    buildah run \$__FISHTANK_BUILD_CTR \$argv
+                end
+
+                function CMD
+                    buildah config --cmd \$argv \$__FISHTANK_BUILD_CTR
+                end
+
+                function LABEL
+                    buildah config --label \$argv \$__FISHTANK_BUILD_CTR
+                end
+
+                function EXPOSE
+                    buildah config --port \$argv \$__FISHTANK_BUILD_CTR
+                end
+
+                function ENV
+                    buildah config --env \$argv \$__FISHTANK_BUILD_CTR
+                end
+
+                function ENTRYPOINT
+                    buildah config --entrypoint \$argv \$__FISHTANK_BUILD_CTR
+                end
+
+                function VOLUME
+                    buildah config --volume \$argv \$__FISHTANK_BUILD_CTR
+                end
+
+                function USER
+                    buildah config --user \$argv \$__FISHTANK_BUILD_CTR
+                end
+
+                function WORKDIR
+                    buildah config --workingdir \$argv \$__FISHTANK_BUILD_CTR
+                end
+
+                function ADD
+                    buildah add \$__FISHTANK_BUILD_CTR \$argv
+                end
+
+                function COPY
+                    buildah copy \$__FISHTANK_BUILD_CTR \$argv
                 end
             "
 

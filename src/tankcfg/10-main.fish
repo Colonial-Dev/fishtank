@@ -37,20 +37,6 @@ function p_annotation -a key value
     w_annotation $key $data
 end
 
-function tankcfg_wrap
-    # RUN
-    # CMD
-    # LABEL
-    # EXPOSE
-    # ENV
-    # ADD
-    # COPY
-    # ENTRYPOINT
-    # VOLUME
-    # USER
-    # WORKDIR
-end
-
 # --- EFFECTIVE ENTRYPOINT --- #
 
 require podman
