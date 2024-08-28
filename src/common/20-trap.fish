@@ -13,37 +13,37 @@ function arm -a victim -d "Arm a non-zero exit code trap for the provided execut
             set -l output (echo $output)
 
             # Write out the command, arguments, and exit code.
-            printf "%serror trapped%s\n" (set_color red -o) (set_color normal)
-            printf "├── command\t%s\n" "$victim"
-            printf "├── argv   \t%s\n" "$argv"
-            printf "├── code   \t%s\n" "$stat"
-            printf "└── "
+            printf "%serror trapped%s\n" (set_color red -o) (set_color normal) >&2
+            printf "├── command\t%s\n" "$victim" >&2
+            printf "├── argv   \t%s\n" "$argv" >&2
+            printf "├── code   \t%s\n" "$stat" >&2
+            printf "└── " >&2
 
-            echo -n (set_color brblack)
+            echo -n (set_color brblack) >&2
 
             # Write out the output (pretty-formatted) if any exists.
             if [ -z "$output" ]
-                printf "(no output)\n"
+                printf "(no output)\n" >&2
             else
-                printf "%s\n" $output[1]
+                printf "%s\n" $output[1] >&2
 
                 for line in $output[2..]
-                    printf "    %s\n" $line
+                    printf "    %s\n" $line >&2
                 end
             end
 
             # Print backtrace, if enabled.
             if [ -n "$fish_trace" ]
-                echo -n (set_color normal)
-                printf "\n--- BACKTRACE ---\n"
+                echo -n (set_color normal) >&2
+                printf "\n--- BACKTRACE ---\n" >&2
                 status stack-trace
             end
 
             # Terminate with code if non-interactive.
             # Otherwise, just return the code.
             if not status is-interactive
-                printf "\n%s: aborting\n" (status basename | string split '.')[1]
-                printf "%s" (set_color normal)
+                printf "\n%s: aborting\n" (status basename | string split '.')[1] >&2
+                printf "%s" (set_color normal) >&2
                 exit $stat
             else
                 return $stat

@@ -61,13 +61,12 @@ function do_build -a def
         set __(echo $match | sed 's/# fishtank //') yes
     end
 
-    set -l invoke podman
+    set -l name (basename -s .tank $def)
 
     if [ -n "$__containerfile" ]
-        set -l name (basename -s .tank $def)
         vprintf "['%s'] Containerfile directive set" "$def"
 
-        set -a invoke build \
+        set -a invoke podman build \
             --pull=newer \
             --annotation manager=fishtank \
             --annotation fishtank.path=$def \
@@ -81,12 +80,14 @@ function do_build -a def
         end
 
         # TODO: add error checking to buildah wrapper
+        # TODO: factor out this big block somehow
+        # TODO: check for quoting errors in wrapper functions
         set -a invoke fish \
             -C "
                 # Change working directory to that of the definition file
                 cd $(dirname $def)
                 # Set flag for tankcfg to check
-                set -l __FISHTANK_IN_BUILD yes
+                set -gx __FISHTANK_IN_BUILD yes
             
                 function buildah
                     if [ \$argv[1] = 'from' ]
@@ -99,7 +100,7 @@ function do_build -a def
                             -a fishtank.name=$name \
                             \$ctr
 
-                        set -x __FISHTANK_BUILD_CTR \$ctr
+                        set -gx __FISHTANK_BUILD_CTR \$ctr
 
                         echo \$ctr
                     else
@@ -159,12 +160,7 @@ function do_build -a def
         set -a invoke $def
     end
 
-
-    if [ -n "$__FISHTANK_DRY_RUN" ]
-        echo $invoke
-    else
-        $invoke
-    end
+    command $invoke
 
     vprintf "['%s'] Build complete!" "$def"
 end

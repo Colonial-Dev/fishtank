@@ -10,7 +10,7 @@ function enumerate_ctrs
         # fish splits on newlines by default, so directly echoing
         # the container IDs means that callers will automatically
         # capture the output as a list.
-        if [ "$manager" == $FT_MANAGER ]
+        if [ "$manager" = $FT_MANAGER ]
             echo $id
         end
     end
@@ -18,10 +18,10 @@ end
 
 # Enumerate all images managed by Fishtank.
 function enumerate_imgs
-    for id in (podman image ls --format "{{.ID}}")
+    for id in (podman image ls --format "{{.ID}}" --filter dangling=false)
         set -l manager (img_annotation $id "manager")
 
-        if [ "$manager" == $FT_MANAGER ]
+        if [ "$manager" = $FT_MANAGER ]
             echo $id
         end
     end
@@ -61,8 +61,34 @@ function check_ctr -a ctr
     end
 end
 
+function make_ctr -a img
+    set -l command podman run -d
+
+    for a in $__ANNOTATIONS
+        if [ $a = args ]
+            continue
+        end
+
+        for entry in (img_annotation $img "fishtank.$a" | string split \x1F)
+            set -a command "--$a"
+            set -a command $entry
+        end
+    end
+
+    set -a command --name
+    set -a command (img_annotation $img "fishtank.name")
+    set -a command --hostname
+    set -a command (img_annotation $img "fishtank.name")
+
+    for entry in (img_annotation $img "fishtank.args" | string split \x1F)
+        set -a command $entry
+    end
+    eprintf "$command"
+    $command $img
+end
+
 function start_ctr -a ctr
-    podman start -d $ctr
+    podman start $ctr
 end
 
 function restart_ctr -a ctr

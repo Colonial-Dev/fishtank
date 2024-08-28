@@ -93,3 +93,28 @@ function any -a fn
 
     return 1
 end
+
+set __CONFIG_FLAGS \
+    entrypoint \
+    env \
+    healthcheck \
+    hostname \
+    port \
+    shell \
+    user \
+    volume \
+    workingdir
+
+set __ANNOTATIONS \
+    args \
+    cap-add \
+    cap-drop \
+    cpus \
+    ram \
+    ulimit \
+    device \
+    userns \
+    security-opt \
+    mount \
+    restart \
+    secret

@@ -1,41 +1,70 @@
-# Start one or more specified container(s),
-# or all Fishtank-managed containers if no arguments are provided.
+set -l options
+set -a options (fish_opt -s a -l all)
+
+# Start one or more specified container(s).
 function tankctl_start
+    argparse -i $options -- $argv
+
+    if [ -n "$_flag_all" ]
+        map start_ctr (enumerate_containers)
+        return
+    end
+
     for_each check_ctr $argv
 
     if [ (count $argv) -ne 0 ]
         map start_ctr $argv
     else
-        map start_ctr (enumerate_containers)
+        abort "no container names or IDs provided"
     end
 end
 
-# Restart one or more specified container(s),
-# or all Fishtank-managed containers if no arguments are provided.
+# Restart one or more specified container(s).
 function tankctl_restart
+    argparse -i $options -- $argv
+
+    if [ -n "$_flag_all" ]
+        map restart_ctr (enumerate_containers)
+        return
+    end
+
     for_each check_ctr $argv
 
     if [ (count $argv) -ne 0 ]
         map restart_ctr $argv
     else
-        map restart_ctr (enumerate_containers)
+        abort "no container names or IDs provided"
     end
 end
 
 # Stop one or more specified container(s),
 # or all Fishtank-managed containers if no arguments are provided.
 function tankctl_stop
+    argparse -i $options -- $argv
+
+    if [ -n "$_flag_all" ]
+        map stop_ctr (enumerate_containers)
+        return
+    end
+
     for_each check_ctr $argv
 
     if [ (count $argv) -ne 0 ]
         map stop_ctr $argv
     else
-        map stop_ctr (enumerate_containers)
+        abort "no container names or IDs provided"
     end
 end
 
 # Remove one or more specified container(s).
 function tankctl_down
+    argparse -i $options -- $argv
+
+    if [ -n "$_flag_all" ]
+        map rm_ctr (enumerate_containers)
+        return
+    end
+
     for_each check_ctr $argv
 
     if [ (count $argv) -eq 0 ]
@@ -47,7 +76,13 @@ end
 
 # Create one or more specified containers from their respective images.
 function tankctl_up
-
+    for img in (enumerate_imgs)
+        if podman ps --format "{{.ImageID}}" | grep -q $img
+            # Ignore unless --replace is set
+        else
+            make_ctr $img
+        end
+    end
 end
 
 function tankctl_list
@@ -87,7 +122,7 @@ require podman
 require buildah
 
 trap rm cp mv ls ln mkdir podman
-trap curl realpath find md5sum fish
+trap curl realpath find fish
 
 if [ -n "$XDG_CONFIG_HOME" ]
     set -x __TANK_DIR "$XDG_CONFIG_HOME/fishtank"
