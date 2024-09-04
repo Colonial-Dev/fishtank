@@ -75,11 +75,20 @@ end
 
 # Create one or more specified containers from their respective images.
 function tankctl_up
+    argparse -i (fish_opt -s r -l replace) -- $argv
+
+    if [ (count $argv) -gt 0 ]
+        map make_ctr $argv $_flag_replace
+        return
+    end
+
     for img in (enumerate_imgs)
         if podman ps --format "{{.ImageID}}" | grep -q $img
-            # Ignore unless --replace is set
+            if set -q _flag_replace
+                make_ctr $img $_flag_replace
+            end
         else
-            make_ctr $img
+            make_ctr $img $_flag_replace
         end
     end
 end
@@ -130,10 +139,14 @@ end
 
 # Attempts to execute the provided command inside
 # the specified container.
-function tankctl_exec -a container command
-    # Check if provided container exists
-    # Check if we manage it, warn and ask for confirmation otherwise
-    # Start if needed
+function tankctl_exec -a container
+    check_ctr $container
+
+    if not ctr_started $container
+        start_ctr $container
+    end
+
+    exec command podman exec -it $container $argv[2..]
 end
 
 # Attempts to execute $SHELL inside the provided container.
@@ -141,10 +154,7 @@ end
 # Note that the value of $SHELL *inside* the container is used,
 # *not* the value on the host.
 function tankctl_enter -a container
-    # Check if provided container exists
-    # Check if we manage it, warn and ask for confirmation otherwise
-    # Start if needed
-    # exec /bin/sh -c "exec \$SHELL"
+    tankctl_exec $container /bin/sh -c "exec \$SHELL"
 end
 
 # --- EFFECTIVE ENTRYPOINT --- #

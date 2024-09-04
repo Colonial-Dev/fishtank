@@ -34,9 +34,9 @@ end
 
 # Check if the provided container is started.
 function ctr_started -a ctr
-    set -l status (podman inspect -t container $ctr --format "{{ .State.Status }}")
+    set -l s (podman inspect -t container $ctr --format "{{ .State.Status }}")
 
-    if [ "$status" != running ]
+    if [ "$s" != running ]
         return 1
     else
         return 0
@@ -60,7 +60,7 @@ function check_ctr -a ctr
     end
 end
 
-function make_ctr -a img
+function make_ctr -a img replace
     set -l name (img_annotation $img "fishtank.name")
     set -l command podman run -d
 
@@ -84,6 +84,10 @@ function make_ctr -a img
 
     set -a command --annotation "manager=fishtank"
     set -a command --annotation "fishtank.name=$name"
+
+    if set -q replace
+        set -a command --replace
+    end
 
     $command $img
     printf " (%s)\n" $name

@@ -63,6 +63,9 @@ switch $argv[1]
         format
         build
         ./target/tankctl help
+    case "install"
+        build
+        cp ./target/* ~/.local/bin
     case "*"
         printf "do: unrecognized target '$argv[1]' - aborting.\n"
         exit 1
