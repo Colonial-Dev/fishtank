@@ -6,7 +6,6 @@ function enumerate_ctrs
         # The 'manager' annotation is not standardized, but distrobox uses it,
         # which is good enough for me.
         set -l manager (ctr_annotation $id "manager")
-
         # fish splits on newlines by default, so directly echoing
         # the container IDs means that callers will automatically
         # capture the output as a list.
@@ -62,6 +61,7 @@ function check_ctr -a ctr
 end
 
 function make_ctr -a img
+    set -l name (img_annotation $img "fishtank.name")
     set -l command podman run -d
 
     for a in $__ANNOTATIONS
@@ -75,16 +75,18 @@ function make_ctr -a img
         end
     end
 
-    set -a command --name
-    set -a command (img_annotation $img "fishtank.name")
-    set -a command --hostname
-    set -a command (img_annotation $img "fishtank.name")
+    set -a command --name $name
+    set -a command --hostname $name
 
     for entry in (img_annotation $img "fishtank.args" | string split \x1F)
         set -a command $entry
     end
-    eprintf "$command"
+
+    set -a command --annotation "manager=fishtank"
+    set -a command --annotation "fishtank.name=$name"
+
     $command $img
+    printf " (%s)\n" $name
 end
 
 function start_ctr -a ctr
@@ -100,5 +102,7 @@ function stop_ctr -a ctr
 end
 
 function rm_ctr -a ctr
+    set -l name (ctr_annotation $ctr "fishtank.name")
     podman rm -ft 0 $ctr
+    printf " (%s)\n" $name
 end

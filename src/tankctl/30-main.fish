@@ -1,12 +1,11 @@
-set -l options
 set -a options (fish_opt -s a -l all)
 
 # Start one or more specified container(s).
 function tankctl_start
     argparse -i $options -- $argv
 
-    if [ -n "$_flag_all" ]
-        map start_ctr (enumerate_containers)
+    if set -q _flag_all
+        map start_ctr (enumerate_ctrs)
         return
     end
 
@@ -23,8 +22,8 @@ end
 function tankctl_restart
     argparse -i $options -- $argv
 
-    if [ -n "$_flag_all" ]
-        map restart_ctr (enumerate_containers)
+    if set -q _flag_all
+        map restart_ctr (enumerate_ctrs)
         return
     end
 
@@ -42,8 +41,8 @@ end
 function tankctl_stop
     argparse -i $options -- $argv
 
-    if [ -n "$_flag_all" ]
-        map stop_ctr (enumerate_containers)
+    if set -q _flag_all
+        map stop_ctr (enumerate_ctrs)
         return
     end
 
@@ -60,8 +59,8 @@ end
 function tankctl_down
     argparse -i $options -- $argv
 
-    if [ -n "$_flag_all" ]
-        map rm_ctr (enumerate_containers)
+    if set -q _flag_all
+        map rm_ctr (enumerate_ctrs)
         return
     end
 
@@ -90,11 +89,43 @@ function tankctl_list
 end
 
 function tankctl_edit
+    set -l tmpfile (mktemp)
+    cp (locate_def $argv[1]) $tmpfile
 
+    while true
+        $EDITOR $tmpfile
+
+        if not command fish -n $tmpfile
+            if confirm "definition contains syntax errors; would you like to resume editing?"
+                continue
+            else
+                return
+            end
+        end
+
+        break
+    end
+
+    cp $tmpfile (locate_def $argv[1])
 end
 
 function tankctl_create
+    argparse -i (fish_opt -r -s l -l link-to) -- $argv
 
+    if set -q _flag_l
+        set dst (locate_def $_flag_l)
+        set src $argv
+
+        if [ -f "$dst" ]
+            ln -s (dirname $dst)/$_flag_l.tank "$__TANK_DIR/$src.tank"
+        else
+            abort "cannot link to non-existent tank definition $_flag_l"
+        end
+    else
+        touch $__TANK_DIR/$argv.tank
+    end
+
+    tankctl_edit $argv[1]
 end
 
 # Attempts to execute the provided command inside
@@ -122,12 +153,12 @@ require podman
 require buildah
 
 trap rm cp mv ls ln mkdir podman
-trap curl realpath find fish
+trap curl realpath find touch
 
 if [ -n "$XDG_CONFIG_HOME" ]
-    set -x __TANK_DIR "$XDG_CONFIG_HOME/fishtank"
+    set -x __TANK_DIR "$XDG_CONFIG_HOME/fishtank/"
 else
-    set -x __TANK_DIR "$HOME/.config/fishtank"
+    set -x __TANK_DIR "$HOME/.config/fishtank/"
 end
 
 mkdir -p $__TANK_DIR

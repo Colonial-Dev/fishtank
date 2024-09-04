@@ -1,3 +1,53 @@
+function RUN
+    buildah run $__FISHTANK_BUILD_CTR $argv
+end
+
+function CMD
+    buildah config --cmd $argv $__FISHTANK_BUILD_CTR
+end
+
+function LABEL
+    buildah config --label $argv $__FISHTANK_BUILD_CTR
+end
+
+function EXPOSE
+    buildah config --port $argv $__FISHTANK_BUILD_CTR
+end
+
+function ENV
+    buildah config --env $argv $__FISHTANK_BUILD_CTR
+end
+
+function ENTRYPOINT
+    buildah config --entrypoint $argv $__FISHTANK_BUILD_CTR
+end
+
+function VOLUME
+    buildah config --volume $argv $__FISHTANK_BUILD_CTR
+end
+
+function USER
+    buildah config --user $argv $__FISHTANK_BUILD_CTR
+end
+
+function WORKDIR
+    buildah config --workingdir $argv $__FISHTANK_BUILD_CTR
+end
+
+function ADD
+    buildah add $__FISHTANK_BUILD_CTR $argv
+end
+
+function COPY
+    buildah copy $__FISHTANK_BUILD_CTR $argv
+end
+
+if string match -q -- "*from sourcing file*" (status)
+    exit
+end
+
+# --- THE CODE BELOW IS ONLY RUN WHEN THE FILE IS *NOT* SOURCED ---
+
 function w_annotation -a key
     buildah config -a "$key="(string join \x1F -- $argv[2..]) $__FISHTANK_BUILD_CTR
 end
@@ -12,21 +62,42 @@ function p_annotation -a key value
     w_annotation $key $data
 end
 
-function RUN
-    buildah run $__FISHTANK_BUILD_CTR $argv
-end
-
 function tankcfg_preset -a preset
     switch $preset
-        case addme
-            set -l USER (whoami)
-            set -l UID  (id -u)
-            set -l GID  (id -g)
+        case cp-user
+            set -l USER
 
-            RUN groupadd --gid $GID $USER
-            RUN useradd --uid $UID --gid $GID -m $USER
+            if [ (count $argv) -gt 1 ]
+                set USER $argv[2]
+            else
+                set USER (whoami)
+            end
+
+            set -l UID (id -u $USER)
+            set -l GID (id -g $USER)
+            set -l SHL (getent passwd $USER | cut -d : -f 7)
+
+            RUN groupadd -g $GID $USER
+            RUN useradd -u $UID -g $GID -m $USER -s $SHL
+            RUN mkdir -p /etc/sudoers.d
             RUN sh -c "echo $USER ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USER"
             RUN chmod 0440 /etc/sudoers.d/$USER
+        case bind-fix
+            p_annotation "fishtank.security-opt" "label=disable"
+            p_annotation "fishtank.userns" keep-id
+        case ssh-agent
+            tankcfg_preset bind-fix
+            tankcfg mount type=bind,src=$SSH_AUTH_SOCK,dst=$SSH_AUTH_SOCK
+        case dotfiles
+            tankcfg_preset bind-fix
+
+            if [ (count $argv) -gt 2 ]
+                set dst $argv[3]
+            else
+                set dst /home/$USER/(basename $argv[2])
+            end
+
+            buildah add --chown $USER:$USER $__FISHTANK_BUILD_CTR $argv[2] $dst
         case '*'
             eprintf "unknown preset $preset"
             exit 1

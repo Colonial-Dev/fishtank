@@ -35,7 +35,7 @@ function lint
         exit 1
     end
 
-    set -l uniq (find src/ -name "*.fish" | xargs grep -ho "^function [a-z1-9_]*" | sort | uniq -d)
+    set -l uniq (find src/ -name "*.fish" | xargs grep -ho "^function [a-zA-Z1-9_]*" | sort | uniq -d)
 
     if [ (count $uniq) -ne 0 ]
         scan | sort | uniq -d
