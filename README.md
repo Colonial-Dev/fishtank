@@ -10,7 +10,7 @@
 ## Features
 Easily create and manage container environments for interactive use. All host integration is strictly opt-in; you choose what (if anything) is shared with each container.
 
-{Image or ASCIInema}
+
 
 Bring your existing Docker-style container definitions...
 
@@ -18,7 +18,9 @@ Bring your existing Docker-style container definitions...
 
 ... or take advantage of Fishtank's custom shell-based format that bundles together all the information needed to build *and* run your containers.
 
-{Image or ASCIInema}
+<p align="center">
+    <img src=".github/README_A.png">
+</p>
 
 Lightweight, easy to install, and works on almost any Linux machine with `podman`.
 
@@ -47,8 +49,7 @@ If you are allergic to `curl | exec`, "building" Fishtank from source using the 
 
 ```sh
 git clone https://github.com/Colonial-Dev/fishtank && cd fishtank
-./do build
-cp target/* $HOME/.local/bin
+./do install
 ```
 
 ## Getting Started

@@ -1,12 +1,12 @@
 function enumerate_defs
-    for path in (find $__TANK_DIR -name "*.tank")
+    for path in (find -L $__TANK_DIR -name "*.tank")
         vprintf "definition at '$path' enumerated"
         echo $path
     end
 end
 
 function locate_def -a name
-    find $__TANK_DIR -name "$name.tank"
+    find -L $__TANK_DIR -name "$name.tank"
 end
 
 function filter_dupes
