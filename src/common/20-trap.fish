@@ -1,18 +1,16 @@
 function arm -a victim -d "Arm a non-zero exit code trap for the provided executable."
     # This function remains in scope, even after 'trap' ends.
     function $victim -V victim -w $victim
-        # Capture both stderr and stdout, using quoted substitution
-        # to avoid splitting into a list.
-        set -l output "$(command $victim $argv 2>&1)"
+        command $victim $argv
         # Capture the status.
-        set -l stat $status
+        set -l s $status
 
         # If the status is not zero, we've trapped an error.
-        if [ "$stat" -ne 0 ]
-            error $victim $stat "$argv" "$output"
+        if [ $s -ne 0 ]
+            error $victim $s "$argv"
         else
-            # If the status is zero, all is well. Print the captured output and return.
-            printf "%s" "$(echo $output)"
+            # If the status is zero, all is well.
+            return 0
         end
     end
 end
@@ -30,29 +28,14 @@ function disarm -d "Remove a non-zero exit code trap for the provided executable
 end
 
 # Pretty-prints an error.
-function error -a victim stat args output
-    # Split the output into a list (on newlines.)
-    set -l output (echo $output)
-
+function error -a victim stat args
     # Write out the command, arguments, and exit code.
     printf "%serror trapped%s\n" (set_color red -o) (set_color normal) >&2
     printf "├── command\t%s\n" "$victim" >&2
     printf "├── argv   \t%s\n" "$args" >&2
-    printf "├── code   \t%s\n" "$stat" >&2
-    printf "└── " >&2
+    printf "└── code   \t%s\n" "$stat" >&2
 
     echo -n (set_color brblack) >&2
-
-    # Write out the output (pretty-formatted) if any exists.
-    if [ -z "$output" ]
-        printf "(no output)\n" >&2
-    else
-        printf "%s\n" $output[1] >&2
-
-        for line in $output[2..]
-            printf "    %s\n" $line >&2
-        end
-    end
 
     # Print backtrace, if enabled.
     if [ -n "$fish_backtrace" ]

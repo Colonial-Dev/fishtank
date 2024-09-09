@@ -77,24 +77,47 @@ end
 function tankctl_up
     argparse -i (fish_opt -s r -l replace) -- $argv
 
+    if set -q _flag_replace
+        set -x _flag_replace yes
+    end
+
     if [ (count $argv) -gt 0 ]
-        map make_ctr $argv $_flag_replace
+        map make_ctr $argv
         return
     end
 
     for img in (enumerate_imgs)
         if podman ps --format "{{.ImageID}}" | grep -q $img
             if set -q _flag_replace
-                make_ctr $img $_flag_replace
+                make_ctr $img
             end
         else
-            make_ctr $img $_flag_replace
+            make_ctr $img
         end
     end
 end
 
 function tankctl_list
+    for ctr in (enumerate_ctrs)
+        set -a list (podman inspect --format "{{.Name}}" $ctr)
+        set -a list (podman inspect --format "{{.ImageName}}" $ctr)
+        set -a list (podman inspect --format "{{.State.Status}}" $ctr)
 
+
+        set -l img (podman inspect --format "{{.Image}}" $ctr)
+        set -l c_hash (ctr_annotation $ctr "fishtank.hash")
+        set -l i_hash (img_annotation $img "fishtank.hash")
+
+        if [ $c_hash != $i_hash ]
+            set -a list no
+        else
+            set -a list yes
+        end
+
+        set -a list \n
+    end
+
+    echo $list | column -t -N "Name,Image,Status,Up to date?"
 end
 
 function tankctl_edit
@@ -157,13 +180,39 @@ function tankctl_enter -a container
     tankctl_exec $container /bin/sh -c "exec \$SHELL"
 end
 
+function tankctl_install
+    set -l URL "https://github.com/Colonial-Dev/fishtank/releases/latest/download"
+
+    if [ -n "$argv[1]" ]
+        set root "$argv[1]"
+    else
+        set root "$HOME/.local/bin"
+    end
+
+    set root (string trim -r -c / $root)
+
+    printf "Downloading component 1/2...   "
+    curl --progress-bar -Lf "$URL/tankctl" >$root/tankctl
+    printf "Downloading component 2/2...   "
+    curl --progress-bar -Lf "$URL/tankcfg" >$root/tankcfg
+
+    chmod +x $root/tankctl
+    chmod +x $root/tankcfg
+
+    if command -q tankcfg; and command -q tankctl
+        echo "Fishtank has been installed successfully - enjoy!"
+    else
+        echo "Fishtank was downloaded to $root, but it doesn't appear to be in your \$PATH - maybe check that?"
+    end
+end
+
 # --- EFFECTIVE ENTRYPOINT --- #
 
 require podman
 require buildah
 
-trap rm cp mv ls ln mkdir podman
-trap curl realpath find touch
+trap rm cp mv ls ln mkdir chmod podman
+trap curl realpath find touch curl
 
 if [ -n "$XDG_CONFIG_HOME" ]
     set -x __TANK_DIR "$XDG_CONFIG_HOME/fishtank/"

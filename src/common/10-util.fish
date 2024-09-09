@@ -31,7 +31,7 @@ end
 # Checks if the provided command exists in $PATH,
 # aborting with an error message if not.
 function require -a command
-    if not type -P "$command" >/dev/null 2>&1
+    if not command -q "$command"
         eprintf "runtime dependency '$command' not found in \$PATH"
         exit 1
     end

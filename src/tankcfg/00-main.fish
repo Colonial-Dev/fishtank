@@ -1,3 +1,4 @@
+# TODO use argparse to make these not suck
 function RUN
     buildah run $__FISHTANK_BUILD_CTR $argv
 end
@@ -65,8 +66,6 @@ end
 function tankcfg_preset -a preset
     switch $preset
         case cp-user
-            set -l USER
-
             if [ (count $argv) -gt 1 ]
                 set USER $argv[2]
             else
@@ -116,7 +115,6 @@ if [ -z "$__FISHTANK_IN_BUILD" ]
 end
 
 if [ -z "$argv[1]" ]
-    tankcfg_help
     abort "no subcommand specified"
 else if functions -q "tankcfg_$argv[1]"
     tankcfg_$argv[1] $argv[2..]
@@ -125,6 +123,5 @@ else if contains "$argv[1]" $__CONFIG_FLAGS
 else if contains "$argv[1]" $__ANNOTATIONS
     p_annotation "fishtank.$argv[1]" "$argv[2..]"
 else
-    tankcfg_help
     abort "unknown subcommand '$argv[1]'"
 end

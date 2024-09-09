@@ -1,3 +1,7 @@
+# TODO all help for commands (automate somehow?)
+# TODO man pages/Github wiki docs
+# TODO completions
+
 function tankctl_help
     echo "\
 A simple interactive container manager for the fish shell.

@@ -60,9 +60,14 @@ function check_ctr -a ctr
     end
 end
 
-function make_ctr -a img replace
+function make_ctr -a img
     set -l name (img_annotation $img "fishtank.name")
+    set -l hash (img_annotation $img "fishtank.hash")
+
     set -l command podman run -d
+
+    set -a command --name $name
+    set -a command --hostname $name
 
     for a in $__ANNOTATIONS
         if [ $a = args ]
@@ -70,27 +75,30 @@ function make_ctr -a img replace
         end
 
         for entry in (img_annotation $img "fishtank.$a" | string split \x1F)
-            set -a command "--$a"
+            if [ -n "$entry" ]
+                set -a command "--$a"
+                set -a command $entry
+            end
+        end
+    end
+
+    for entry in (img_annotation $img "fishtank.args" | string split \x1F)
+        if [ -n "$entry" ]
             set -a command $entry
         end
     end
 
-    set -a command --name $name
-    set -a command --hostname $name
-
-    for entry in (img_annotation $img "fishtank.args" | string split \x1F)
-        set -a command $entry
-    end
-
     set -a command --annotation "manager=fishtank"
     set -a command --annotation "fishtank.name=$name"
+    set -a command --annotation "fishtank.hash=$hash"
 
-    if set -q replace
+    if [ -n "$_flag_replace" ]
         set -a command --replace
     end
 
-    $command $img
-    printf " (%s)\n" $name
+    set -a command "$img"
+
+    printf "%s (%s)\n" ($command) $name
 end
 
 function start_ctr -a ctr
@@ -107,6 +115,5 @@ end
 
 function rm_ctr -a ctr
     set -l name (ctr_annotation $ctr "fishtank.name")
-    podman rm -ft 0 $ctr
-    printf " (%s)\n" $name
+    printf "%s (%s)\n" (podman rm -ft 0 $ctr) $name
 end
