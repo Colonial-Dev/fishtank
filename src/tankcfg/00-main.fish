@@ -1,6 +1,61 @@
-# TODO use argparse to make these not suck
-function RUN
-    buildah run $__FISHTANK_BUILD_CTR $argv
+function RUN 
+    # We can't use 'contains' here, as it consumes '--' when parsing arguments.
+    for arg in $argv
+        if [ $arg = "--" ]
+            set _has_opts yes
+        end
+    end
+
+    if set -q _has_opts
+        for arg in $argv
+            if set -q _passed_opts
+                set -a right_opts $arg
+            else
+                if [ $arg = "--" ]
+                    set _passed_opts yes
+                    continue
+                end
+
+                set -a left_opts $arg
+            end
+        end
+    else
+        set right_opts $argv
+    end
+
+    buildah run $left_opts -- $__FISHTANK_BUILD_CTR $right_opts
+end
+
+function ADD
+    # We can't use 'contains' here, as it consumes '--' when parsing arguments.
+    for arg in $argv
+        if [ $arg = "--" ]
+            set _has_opts yes
+        end
+    end
+
+    if set -q _has_opts
+        for arg in $argv
+            if set -q _passed_opts
+                set -a right_opts $arg
+            else
+                if [ $arg = "--" ]
+                    set _passed_opts yes
+                    continue
+                end
+
+                set -a left_opts $arg
+            end
+        end
+    else
+        set right_opts $argv
+    end
+
+    buildah add $left_opts $__FISHTANK_BUILD_CTR $right_opts
+end
+
+function COPY
+    ADD $argv
 end
 
 function CMD
@@ -33,14 +88,6 @@ end
 
 function WORKDIR
     buildah config --workingdir $argv $__FISHTANK_BUILD_CTR
-end
-
-function ADD
-    buildah add $__FISHTANK_BUILD_CTR $argv
-end
-
-function COPY
-    buildah copy $__FISHTANK_BUILD_CTR $argv
 end
 
 if string match -q -- "*from sourcing file*" (status)
@@ -87,16 +134,10 @@ function tankcfg_preset -a preset
         case ssh-agent
             tankcfg_preset bind-fix
             tankcfg mount type=bind,src=$SSH_AUTH_SOCK,dst=$SSH_AUTH_SOCK
-        case dotfiles
+        case dbus
+            set -l socket (printf "%s" "$DBUS_SESSION_BUS_ADDRESS}" | sed -e 's/unix:path=\(.\+\)/src=\1,dst=\1/')
             tankcfg_preset bind-fix
-
-            if [ (count $argv) -gt 2 ]
-                set dst $argv[3]
-            else
-                set dst /home/$USER/(basename $argv[2])
-            end
-
-            buildah add --chown $USER:$USER $__FISHTANK_BUILD_CTR $argv[2] $dst
+            tankcfg mount type=bind,$socket
         case '*'
             eprintf "unknown preset $preset"
             exit 1
