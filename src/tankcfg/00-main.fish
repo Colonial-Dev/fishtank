@@ -1,7 +1,7 @@
-function RUN 
+function RUN
     # We can't use 'contains' here, as it consumes '--' when parsing arguments.
     for arg in $argv
-        if [ $arg = "--" ]
+        if [ $arg = -- ]
             set _has_opts yes
         end
     end
@@ -11,7 +11,7 @@ function RUN
             if set -q _passed_opts
                 set -a right_opts $arg
             else
-                if [ $arg = "--" ]
+                if [ $arg = -- ]
                     set _passed_opts yes
                     continue
                 end
@@ -29,7 +29,7 @@ end
 function ADD
     # We can't use 'contains' here, as it consumes '--' when parsing arguments.
     for arg in $argv
-        if [ $arg = "--" ]
+        if [ $arg = -- ]
             set _has_opts yes
         end
     end
@@ -39,7 +39,7 @@ function ADD
             if set -q _passed_opts
                 set -a right_opts $arg
             else
-                if [ $arg = "--" ]
+                if [ $arg = -- ]
                     set _passed_opts yes
                     continue
                 end

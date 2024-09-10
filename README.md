@@ -91,36 +91,124 @@ The harness for shell-based definitions enables two primary toolkits for setting
   - Provide arbitrary additional arguments to pass to `podman run`
   - Apply several prepackaged presets (such as copying a user from the host into the container, or applying security options to fix bind mounts with SELinux)
 
-Click to show all `tankcfg` options:
+Complete details on all commands can be found in the `man` pages bundled with Fishtank. Alternatively, you can view their Markdown versions [here](https://github.com/Colonial-Dev/fishtank/tree/master/doc).
+
+___
+
+For those who would like a concrete example, this is a (annotated and trimmed down) copy of the definition I use
+for my development containers.
 
 ```sh
-tankcfg entrypoint
-tankcfg env
-tankcfg healthcheck
-tankcfg hostname
-tankcfg port
-tankcfg shell
-tankcfg user
-tankcfg volume
-tankcfg workingdir
+#!/usr/bin/env fish
+# A shebang is not necessary, but it enables correct syntax highlighting in my editor.
 
-tankcfg args
-tankcfg cap-add
-tankcfg cap-drop
-tankcfg cpus
-tankcfg ram
-tankcfg ulimit
-tankcfg device
-tankcfg userns
-tankcfg security-opt
-tankcfg mount
-tankcfg restart
-tankcfg secret
+# If this is the 'base' definition, bail silently - we don't need to build that.
+#
+# Fishtank tries to be relatively stateless, so it doesn't bother detecting that no image
+# was actually built and comitted.
+if [ (status basename | xargs basename -s .tank) = "base" ]
+    exit
+end
 
-tankcfp preset cp-user
+# Fedora Toolbox is my preferred base, but there are similar images
+# available for distributions like Debian and Arch.
+#
+# The 'buildah' command here is actually a transparent wrapper injected by Fishtank;
+# when you invoke the 'from' subcommand, it does some book-keeping to integrate
+# the working container with Fishtank.
+set ctr (buildah from fedora-toolbox:latest)
+
+# Copy my user into the container.
+#
+# You may notice that these commands don't take a 'container' argument;
+# that's because the aforementioned 'buildah' wrapper exports that information
+# into a fixed shell variable for these commands to use internally.
+tankcfg preset cp-user $USER
+# Fix Unix and SELinux permission issues with rootless mounting of host files.
 tankcfg preset bind-fix
+# Mount the SSH agent socket into the container. (Implies bind-fix)
 tankcfg preset ssh-agent
+
+# Set the working user to myself...
+USER    $USER
+# ... and the working directory to my $HOME inside the container.
+WORKDIR /home/$USER
+# A dummy 'infinite command' like this keeps the container alive so processes on the host
+# can spawn 'exec' sessions inside.
+CMD     "sleep inf"
+
+# Copy my GNU Stow .dotfiles directory into the container.
+ADD --chown $USER:$USER -- $HOME/.dotfiles /home/$USER/.dotfiles
+
+# Install some basics (preferred shell and editor, GNU Stow.)
+RUN sudo dnf install -y fish micro stow
+# Stow my basic dotfiles, as well as some container specific ones.
+RUN stow -d /home/$USER/.dotfiles --dotfiles common
+RUN stow -d /home/$USER/.dotfiles --dotfiles container
+
+# This 'EXTENSIONS' variable is used in a small script, unrelated to this project,
+# that automatically installs extensions into the Visual Studio Code development container server.
+set -a EXTENSIONS Gruntfuggly.todo-tree
+set -a EXTENSIONS mhutchie.git-graph
+
+# A switch statement is used to branch on the symlink this definition was invoked from,
+# allowing multiple different definitions to build on a common base (above.)
+#
+# I have more than just these two, but two is sufficient to get the point across.
+switch (status basename | xargs basename -s .tank)
+# A C development environment for a course on networks that I am currently taking.
+case "p438"
+    set -a EXTENSIONS llvm-vs-code-extensions.vscode-clangd
+    set -a EXTENSIONS vadimcn.vscode-lldb
+    
+    ENV "EXTENSIONS=$EXTENSIONS" 
+    
+    RUN sudo dnf groupinstall -y "C Development Tools and Libraries"
+    RUN sudo dnf install      -y clang clang-tools-extra
+    RUN sudo dnf install      -y pip
+    RUN pip install --user scons
+
+    # Mount my coursework repository into the container $HOME, and nothing else.
+    tankcfg mount type=bind,src=$HOME/Documents/CS,dst=/home/$USER/CS
+# A Rust development environment for my personal projects.
+case "rust"
+    set -a EXTENSIONS vadimcn.vscode-lldb
+    set -a EXTENSIONS tamasfe.even-better-toml
+    set -a EXTENSIONS rust-lang.rust-analyzer
+    
+    ENV "EXTENSIONS=$EXTENSIONS" 
+    ENV "CARGO_INSTALL_ROOT=/home/$USER/.local"
+    
+    RUN sh -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+
+    # Rust needs a C/++ toolchain for building foreign dependencies.
+    RUN sudo dnf groupinstall -y "Development Tools"
+    RUN sudo dnf groupinstall -y "C Development Tools and Libraries"
+    RUN mkdir -p /home/$USER/.local/bin
+    
+    # Mount my projects directory, as well as the host user binary directory.
+    #
+    # Combined with setting CARGO_INSTALL_ROOT, this means I can 'cargo install' binaries
+    # inside the container and use them outside it.
+    tankcfg mount type=bind,src=$HOME/Documents/Projects,dst=/home/$USER/Projects
+    tankcfg mount type=bind,src=$HOME/.local/bin/,dst=/home/$USER/.local/bin/
+# Nominally unreachable.
+case "*"
+    exit 1
+end
+
+# Commit the container, basing the name on the symlink used to invoke this definition.
+buildah commit $ctr localhost/(status basename | xargs basename -s .tank)
 ```
+
+The file layout for this particular definition looks something like this:
+```sh
+base.tank # Singular authoritative definition
+p438.tank # Symbolic link to base.tank
+rust.tank # Symbolic link to base.tank
+```
+
+Using symbolic links for "branching builds" like this is one of my pet tricks, but it's not required!
 
 ## FAQ
 
