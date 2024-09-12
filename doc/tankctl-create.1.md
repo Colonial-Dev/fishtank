@@ -1,21 +1,36 @@
-# NAME
-```
-tankctl create
-```
+% FISHTANK(1) Version 1.0 | User Manual
 
-# DESCRIPTION
+NAME
+====
+**tankctl-create** - create a new container definition, or a symbolic link to an existing one.
+
+SYNOPSIS
+========
+
+| **tankctl create** \[**-l**|**--link-to** *definition*\] *name*
+| **tankctl create** \[**-h**|**--help**\]
+
+DESCRIPTION
+===========
+
 `create` creates a new file or symbolic link for a container definition in `$XDG_CONFIG_HOME/fishtank/` (typically `$HOME/.config/fishtank/`) and opens it for editing using `$EDITOR`.
 
 All edits are performed in a temporary file; upon saving and exiting, `tankctl` will perform a syntax validity check before writing any changes back to the original file.
 
-# SYNOPSIS
-**tankctl create**
+Options
+-------
 
-```
--l/--link-to: specify an existing definition to symlink to rather than creating a new file
-```
+-l, --link-to *definition*
 
-# EXAMPLES
+: Build images even if the definition has not changed.
+
+-h, --help
+
+:  Displays this manual page.
+
+EXAMPLES
+========
+
 Create a new definition called `cpp`:
 
 ```
@@ -27,3 +42,8 @@ Create a new definition called `cpp` that symlinks to an existing definition cal
 ```
 tankctl create --link-to c cpp
 ```
+
+SEE ALSO
+========
+
+**tankcfg(1)**, **podman(1)**, **buildah(1)**

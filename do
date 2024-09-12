@@ -50,6 +50,14 @@ function format
     end
 end
 
+function manual
+    mkdir -p ./doc/man
+
+    for file in (find doc/ -name "*.md")
+        pandoc --standalone --to man --from markdown-smart -o $file man/(basename -s .md $file)
+    end
+end
+
 switch $argv[1]
     case "build"
         build

@@ -1,6 +1,0 @@
-# NAME
-```
-tankctl
-```
-
-# DESCRIPTION

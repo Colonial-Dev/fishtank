@@ -15,6 +15,7 @@ Commands:
   down    - stop and remove one or more containers
   edit    - edit a definition
   up      - create and start one or more containers
+  reup    - remove and recreate one or more containers
 
   [ Work with live containers ]
   enter   - execute \$SHELL inside a container

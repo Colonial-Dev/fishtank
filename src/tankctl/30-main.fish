@@ -97,6 +97,25 @@ function tankctl_up
     end
 end
 
+function tankctl_reup
+    argparse -i $options -- $argv
+
+    if set -q _flag_all
+        map rm_ctr (enumerate_ctrs)
+        map tankctl_up (enumerate_imgs)
+        return
+    end
+
+    for_each check_ctr $argv
+
+    if [ (count $argv) -eq 0 ]
+        abort "no container names or IDs provided"
+    end
+
+    map rm_ctr $argv
+    map tankctl_up $argv
+end
+
 function tankctl_list
     for ctr in (enumerate_ctrs)
         set -a list (podman inspect --format "{{.Name}}" $ctr)

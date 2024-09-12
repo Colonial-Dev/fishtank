@@ -151,5 +151,9 @@ function tankctl_build
         set defs (filter_unchanged $defs)
     end
 
+    if [ (count $defs) -eq 0 ]
+        abort "no valid definitions found - did you make a typo or forget --force?"
+    end
+
     map do_build $defs
 end

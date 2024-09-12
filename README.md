@@ -91,6 +91,8 @@ The harness for shell-based definitions enables two primary toolkits for setting
   - Provide arbitrary additional arguments to pass to `podman run`
   - Apply several prepackaged presets (such as copying a user from the host into the container, or applying security options to fix bind mounts with SELinux)
 
+Once you have a definition, run `tankctl build` to compile it into an OCI image, followed by `tankctl up` to create a container from the image.
+
 Complete details on all commands can be found in the `man` pages bundled with Fishtank. Alternatively, you can view their Markdown versions [here](https://github.com/Colonial-Dev/fishtank/tree/master/doc).
 
 ___
@@ -201,14 +203,36 @@ end
 buildah commit $ctr localhost/(status basename | xargs basename -s .tank)
 ```
 
-The file layout for this particular definition looks something like this:
+The file layout for this particular definition looks similar to this:
+
 ```sh
+# Using symbolic links for "branching builds" like this is one of my pet tricks, but it's not required!
 base.tank # Singular authoritative definition
 p438.tank # Symbolic link to base.tank
 rust.tank # Symbolic link to base.tank
 ```
 
-Using symbolic links for "branching builds" like this is one of my pet tricks, but it's not required!
+While Fishtank may be branded as an "interactive" container manager, it works just as well for containerized services. This definition is all I need for my Jellyfin server, including support for AMD hardware acceleration:
+
+```sh
+#!/usr/bin/env fish
+
+set ctr (buildah from jellyfin/jellyfin:latest)
+
+tankcfg preset bind-fix
+
+tankcfg device /dev/dri/renderD128 
+tankcfg mount type=bind,src=$HOME/Executable/Jellyfin/config,dst=/config
+tankcfg mount type=bind,src=$HOME/Executable/Jellyfin/cache,dst=/cache
+tankcfg mount type=bind,src=$HOME/Videos/DLNA,dst=/media,ro=true
+
+tankcfg args "--net=host" 
+tankcfg args "--group-add=105" 
+tankcfg args "--user=1000:1000"
+
+buildah commit $ctr jellyfin
+```
+
 
 ## FAQ
 
@@ -234,6 +258,14 @@ Fishtank also requires that every container be associated with a "definition," r
 So:
 - If you don't mind the above caveats and want containerized environments that Just Work with the host, use Toolbx or Distrobox.
 - If you *do* mind the above caveats and/or want some declarative-ness in your containers, give Fishtank a try.
+
+
+### "Why not just use Kubernetes YAML or `compose`?"
+A few reasons:
+
+1. Separating the information on how to *build* the image from information on how to *run* it is lame, especially for Fishtank's target use case of "bespoke interactive containers."
+2. Kubernetes YAML is massively overcomplicated, and the `podman` version of `compose` was somewhat buggy when I tried it.
+3. YAML sucks.
 
 [^1]: Only ~1000 lines of pure Fish shell code.
 
