@@ -110,7 +110,7 @@ set __ANNOTATIONS \
     cap-add \
     cap-drop \
     cpus \
-    ram \
+    memory \
     ulimit \
     device \
     userns \

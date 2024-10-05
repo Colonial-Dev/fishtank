@@ -74,6 +74,8 @@ switch $argv[1]
     case "install"
         build
         cp ./target/* ~/.local/bin
+    case "manual"
+        manual
     case "*"
         printf "do: unrecognized target '$argv[1]' - aborting.\n"
         exit 1
