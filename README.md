@@ -26,7 +26,7 @@ Bring your existing Docker-style container definitions...
     <img src=".github/README_A.png">
 </p>
 
-Lightweight[^1], easy to install, and works on any[^2] Linux machine with `podman` and `fish`,
+Lightweight[^1], easy to install, and works on any[^2] Linux machine with `podman` and `fish`.
 
 <p align="center">
     <img src=".github/demo_install.gif">

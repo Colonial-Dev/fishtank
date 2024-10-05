@@ -94,6 +94,8 @@ function make_ctr -a img
 
     if [ -n "$_flag_replace" ]
         set -a command --replace
+    else if podman ps -a --format "{{.Names}}" | grep -q $name
+        return
     end
 
     set -a command "$img"

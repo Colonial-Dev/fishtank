@@ -18,9 +18,9 @@ DESCRIPTION
 Options
 -------
 
--l, --link-to *definition*
+-a, --all
 
-: Build images even if the definition has not changed.
+: Remove all managed containers.
 
 -h, --help
 
@@ -29,16 +29,15 @@ Options
 EXAMPLES
 ========
 
-Create a new definition called `cpp`:
+Stop and remove a container called `cpp`:
 
 ```
-tankctl create cpp
+tankctl down cpp
 ```
 
-Create a new definition called `cpp` that symlinks to an existing definition called `c`:
-
+Stop and remove all managed containers:
 ```
-tankctl create --link-to c cpp
+tankctl down --all
 ```
 
 SEE ALSO

@@ -37,6 +37,10 @@ create
 
 : Create a new container definition, or a symbolic link to an existing one.
 
+containers
+
+: List all managed containers and their status.
+
 down
 
 : Stop and remove one or more managed containers.
@@ -53,9 +57,9 @@ exec
 
 : Execute an arbitrary command inside a container.
 
-list
+images
 
-: List all managed containers and their status.
+: List all managed images.
 
 restart 
 

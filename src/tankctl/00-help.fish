@@ -1,5 +1,5 @@
 # TODO all help for commands (automate somehow?)
-# TODO man pages/Github wiki docs
+# TODO man pages
 # TODO completions
 
 function tankctl_help

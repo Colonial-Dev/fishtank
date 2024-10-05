@@ -87,7 +87,7 @@ function tankctl_up
     end
 
     for img in (enumerate_imgs)
-        if podman ps --format "{{.ImageID}}" | grep -q $img
+        if podman ps -a --format "{{.ImageID}}" | grep -q $img
             if set -q _flag_replace
                 make_ctr $img
             end
@@ -116,7 +116,7 @@ function tankctl_reup
     map tankctl_up $argv
 end
 
-function tankctl_list
+function tankctl_containers
     for ctr in (enumerate_ctrs)
         set -a list (podman inspect --format "{{.Name}}" $ctr)
         set -a list (podman inspect --format "{{.ImageName}}" $ctr)
@@ -137,6 +137,10 @@ function tankctl_list
     end
 
     echo $list | column -t -N "Name,Image,Status,Up to date?"
+end
+
+function tankctl_images
+    # TODO
 end
 
 function tankctl_edit
