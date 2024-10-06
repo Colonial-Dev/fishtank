@@ -2,7 +2,7 @@
 
 NAME
 ====
-**tankctl-reup** - restart and recreate one or more managed containers.
+**tankctl-reup** - remove and recreate one or more managed containers.
 
 SYNOPSIS
 ========

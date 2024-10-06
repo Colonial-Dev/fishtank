@@ -33,6 +33,10 @@ dbus
 
 : Mounts the host DBUS socket into the container. Implies `bind-fix`.
 
+dev
+
+: Mounts all host devices (i.e. `/dev`) into the container. Warning - this will run the container as `--privileged`!
+
 SEE ALSO
 ========
 

@@ -138,6 +138,11 @@ function tankcfg_preset -a preset
             set -l socket (printf "%s" "$DBUS_SESSION_BUS_ADDRESS}" | sed -e 's/unix:path=\(.\+\)/src=\1,dst=\1/')
             tankcfg_preset bind-fix
             tankcfg mount type=bind,$socket
+        case dev
+            p_annotation "fishtank.args" "--privileged"
+            
+            tankcfg mount type=devpts,destination=/dev/pts
+            tankcfg mount type=bind,src=/dev,dst=/dev,rslave=true
         case '*'
             eprintf "unknown preset $preset"
             exit 1
