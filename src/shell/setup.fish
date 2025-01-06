@@ -23,7 +23,7 @@ function RUN
         set right_opts $argv
     end
 
-    buildah run $left_opts -- $__FISHTANK_BUILD_CTR $right_opts
+    buildah run $left_opts -- $__BOX_BUILD_CTR $right_opts
 end
 
 function ADD
@@ -51,7 +51,7 @@ function ADD
         set right_opts $argv
     end
 
-    buildah add $left_opts $__FISHTANK_BUILD_CTR $right_opts
+    buildah add $left_opts $__BOX_BUILD_CTR $right_opts
 end
 
 function COPY
@@ -59,35 +59,35 @@ function COPY
 end
 
 function CMD
-    buildah config --cmd $argv $__FISHTANK_BUILD_CTR
+    buildah config --cmd $argv $__BOX_BUILD_CTR
 end
 
 function LABEL
-    buildah config --label $argv $__FISHTANK_BUILD_CTR
+    buildah config --label $argv $__BOX_BUILD_CTR
 end
 
 function EXPOSE
-    buildah config --port $argv $__FISHTANK_BUILD_CTR
+    buildah config --port $argv $__BOX_BUILD_CTR
 end
 
 function ENV
-    buildah config --env $argv $__FISHTANK_BUILD_CTR
+    buildah config --env $argv $__BOX_BUILD_CTR
 end
 
 function ENTRYPOINT
-    buildah config --entrypoint $argv $__FISHTANK_BUILD_CTR
+    buildah config --entrypoint $argv $__BOX_BUILD_CTR
 end
 
 function VOLUME
-    buildah config --volume $argv $__FISHTANK_BUILD_CTR
+    buildah config --volume $argv $__BOX_BUILD_CTR
 end
 
 function USER
-    buildah config --user $argv $__FISHTANK_BUILD_CTR
+    buildah config --user $argv $__BOX_BUILD_CTR
 end
 
 function WORKDIR
-    buildah config --workingdir $argv $__FISHTANK_BUILD_CTR
+    buildah config --workingdir $argv $__BOX_BUILD_CTR
 end
 
 if string match -q -- "*from sourcing file*" (status)
@@ -97,11 +97,11 @@ end
 # --- THE CODE BELOW IS ONLY RUN WHEN THE FILE IS *NOT* SOURCED ---
 
 function w_annotation -a key
-    buildah config -a "$key="(string join \x1F -- $argv[2..]) $__FISHTANK_BUILD_CTR
+    buildah config -a "$key="(string join \x1F -- $argv[2..]) $__BOX_BUILD_CTR
 end
 
 function r_annotation -a key
-    buildah inspect -t container --format "{{index .ImageAnnotations \"$key\"}}" $__FISHTANK_BUILD_CTR | string split \x1F
+    buildah inspect -t container --format "{{index .ImageAnnotations \"$key\"}}" $__BOX_BUILD_CTR | string split \x1F
 end
 
 function p_annotation -a key
@@ -165,7 +165,7 @@ if [ -z "$argv[1]" ]
 else if functions -q "tankcfg_$argv[1]"
     tankcfg_$argv[1] $argv[2..]
 else if contains "$argv[1]" $__CONFIG_FLAGS
-    buildah config "--$argv[1]" $argv[2..] $__FISHTANK_BUILD_CTR
+    buildah config "--$argv[1]" $argv[2..] $__BOX_BUILD_CTR
 else if contains "$argv[1]" $__ANNOTATIONS
     p_annotation "fishtank.$argv[1]" $argv[2..]
 else

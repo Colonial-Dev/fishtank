@@ -1,10 +1,10 @@
-<h1 align="center">Fishtank</h1>
-<h3 align="center">An interactive container manager for the <code>fish</code> shell.</h3>
+<h1 align="center">Box</h1>
+<h3 align="center">An interactive container manager for your shell.</h3>
 
 <p align="center">
-<img src="https://img.shields.io/github/actions/workflow/status/Colonial-Dev/fishtank/fish.yml">
-<img src="https://img.shields.io/github/license/Colonial-Dev/fishtank">
-<img src="https://img.shields.io/github/stars/Colonial-Dev/fishtank">
+<img src="https://img.shields.io/github/actions/workflow/status/Colonial-Dev/box/fish.yml">
+<img src="https://img.shields.io/github/license/Colonial-Dev/box">
+<img src="https://img.shields.io/github/stars/Colonial-Dev/box">
 </p>
 
 ## Features
@@ -14,49 +14,20 @@ Easily create and manage container environments for interactive use. All host in
     <img src=".github/demo.gif">
 </p>
 
-Bring your existing Docker-style container definitions...
-
-<p align="center">
-    <img src=".github/README_B.png">
-</p>
-
-... or take advantage of Fishtank's custom shell-based format that bundles together all the information needed to build *and* run your containers.
+Take advantage of Box's custom shell-based format that bundles together all the information needed to build *and* run your containers.
 
 <p align="center">
     <img src=".github/README_A.png">
 </p>
 
-Lightweight[^1], easy to install, and works on any[^2] Linux machine with `podman` and `fish`.
+Lightweight[^1], easy to install, and works on any[^2] Linux machine with `podman` and a compatible shell (POSIX-compliant or `fish`.)
 
 <p align="center">
     <img src=".github/demo_install.gif">
 </p>
 
 ## Installation
-Before installing, make sure you have the following packages on your system:
-- `fish`
-- `podman`
-- `coreutils`
-
-```sh
-curl -Lf https://github.com/Colonial-Dev/fishtank/releases/latest/download/tankctl | source - install
-```
-
-This downloads the latest stable version of Fishtank and uses the self-update functionality to bootstrap a persistent install.
-
-By default, this installs two scripts (`tankctl` and `tankcfg`) in the XDG-specified `$HOME/.local/bin` directory - to override the install location, simply pass your preferred path as the third argument:
-
-```sh
-curl -Lf https://github.com/Colonial-Dev/fishtank/releases/latest/download/tankctl | source - install /usr/bin
-```
-
-### From Source
-If you are allergic to `curl | exec`, "building" Fishtank from source using the bundled `do` script is also possible.
-
-```sh
-git clone https://github.com/Colonial-Dev/fishtank && cd fishtank
-./do install
-```
+Before installing, make sure you have `podman` and a supported shell (either `fish` or anything POSIX-compliant) installed on your system.
 
 ## Getting Started
 
