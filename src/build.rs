@@ -1,8 +1,7 @@
-use std::fs;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
-use walkdir::WalkDir;
 
 use crate::prelude::*;
 
@@ -10,17 +9,23 @@ use crate::prelude::*;
 
 // For POSIX shells - build a script "on the fly" that sources the init using `source <(bx _init posix)`
 // then executes the script in a subshell
+// Something like:
+//
+// source <(bx _init posix)
+// (
+//    # Script contents
+// )
 
 pub type Definitions = Vec<Definition>;
 
-#[derive(Debug)]
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Definition {
     pub path: PathBuf,
     pub hash: u64,
     pub meta: Metadata,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Hash, PartialEq, Eq, Deserialize)]
 pub struct Metadata {
     #[serde(default)]
     pub depends_on    : Vec<String>,
@@ -30,19 +35,23 @@ pub struct Metadata {
 
 impl Definition {
     pub fn enumerate() -> Result<Definitions> {
+        use std::fs;
         use std::ffi::OsStr;
-        use walkdir::WalkDir;
 
         let dir = definition_directory()?;
 
         let mut out = vec![];
 
-        for entry in WalkDir::new(dir) {
+        for entry in fs::read_dir(dir).context("Fault when starting definition enumeration")? {
             let entry = entry
                 .context("Fault when iterating over definition directory")
                 .suggestion("Do you have permission issues?")?;
 
-            if entry.file_type().is_dir() {
+            if entry
+                .file_type()
+                .context("Failed to get entry file type")?
+                .is_dir() 
+            {
                 continue;
             }
 
@@ -80,16 +89,14 @@ impl Definition {
     }
 
     pub fn find(name: &str) -> Result<Self> {
+        use std::fs;
         use std::ffi::OsStr;
-        
-        use nucleo_matcher::{Matcher, Config};
-        use nucleo_matcher::pattern::*;
 
         let dir  = definition_directory()?;
         let stem = OsStr::new(name);
 
-        let entry = WalkDir::new(dir)
-            .into_iter()
+        let entry = fs::read_dir(dir)
+            .context("Fault when starting definition search")?
             .filter_map(Result::ok)
             .find(|e| e.path().file_stem() == stem.into());
 
@@ -98,30 +105,8 @@ impl Definition {
                 .context("Failed to load and parse definition")
         }
         else {
-            let defs = Self::enumerate()
-                .context("Failed to enumerate definitions for fuzzy matching")?;
-
-            let names: Vec<_> = defs
-                .iter()
-                .filter_map(|d| {
-                    d
-                        .path
-                        .file_stem()
-                        .and_then(OsStr::to_str)
-                })
-                .collect();
-
-            let mut matcher = Matcher::new(Config::DEFAULT);
-
-            let matches = Pattern::new(
-                name,
-                CaseMatching::Ignore,
-                Normalization::Smart,
-                AtomKind::Fuzzy
-            ).match_list(names, &mut matcher);
-    
-            let suggestion = match matches.first() {
-                Some(m) => format!("Did you mean: {}", m.0),
+            let suggestion = match Self::alternative(name) {
+                Some(m) => format!("Did you mean: {}", m),
                 None => "Did you make a typo?".to_string(),
             };
 
@@ -130,10 +115,28 @@ impl Definition {
 
             Err(err)
         }
+    }
+
+    pub fn exists(name: &str) -> Result<bool> {
+        use std::fs;
+
+        let path = definition_directory()?
+            .join(
+                format!("{name}.box")
+            );
         
+        fs::exists(path)
+            .map_err(|e| {
+                Report::new(e)
+                    .wrap_err(
+                        format!("Fault when checking if definition ({name}) exists")
+                    )
+            })
     }
 
     pub fn from_path(p: impl AsRef<Path>) -> Result<Self> {
+        use std::fs;
+
         let path = p.as_ref().to_owned();
 
         let data = fs::read_to_string(&path)
@@ -161,6 +164,20 @@ impl Definition {
         Ok(Self { path, hash, meta })
     }
 
+    pub fn name(&self) -> &str {
+        use std::ffi::OsStr;
+
+        self
+            .path
+            .file_stem()
+            .and_then(OsStr::to_str)
+            .expect("Definition name should be valid UTF-8")
+    }
+
+    pub fn depends_on(&self) -> &[String] {
+        &self.meta.depends_on
+    }
+
     pub fn build(&self) -> Result<()> {
         info!(
             "Building definition at path {:?}...",
@@ -177,6 +194,63 @@ impl Definition {
             &self.path
         );
 
+        Ok(())
+    }
+
+    /// Finds an alternative definition name that is similar to the given name.
+    ///
+    /// This function uses fuzzy matching to find a definition name that is close to the given name.
+    /// If no match is found, it returns `None`.
+    pub fn alternative(name: &str) -> Option<String> {
+        use std::ffi::OsStr;
+
+        use nucleo_matcher::{Matcher, Config};
+        use nucleo_matcher::pattern::*;
+
+        let defs = match Self::enumerate() {
+            Ok(defs) => defs,
+            Err(err) => {
+                warn!("Failed to enumerate definitions for fuzzy matching: {}", err);
+                return None;
+            }
+        };
+
+        let names: Vec<_> = defs
+            .iter()
+            .filter_map(|d| {
+                d
+                    .path
+                    .file_stem()
+                    .and_then(OsStr::to_str)
+            })
+            .collect();
+
+        let mut matcher = Matcher::new(Config::DEFAULT);
+
+        Pattern::new(
+            name,
+            CaseMatching::Ignore,
+            Normalization::Smart,
+            AtomKind::Fuzzy
+        )
+        .match_list(names, &mut matcher)
+        .first()
+        .map(|(m, _)| m)
+        .copied()
+        .map(str::to_owned)
+    }
+}
+
+impl Definition {
+    pub fn create(name: String) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn edit(name: String) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn delete(name: String) -> Result<()> {
         Ok(())
     }
 }
@@ -226,8 +300,12 @@ pub fn definition_directory() -> Result<PathBuf> {
     }
 }
 
-pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
-    let set: Vec<_> = match all {
+pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {   
+    use petgraph::Graph;
+    use petgraph::algo::toposort;
+    use petgraph::visit::Dfs;
+
+    let mut set: Vec<_> = match all {
         false => {
             let (defs, errors): (Vec<_>, Vec<_>) = defs
                 .iter()
@@ -252,40 +330,107 @@ pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
                     .collect()
             }
         },
-        true  => Definition::enumerate()?
+        true => Definition::enumerate()?
     };
 
     if set.is_empty() {
         let err = eyre!("No definitions found")
             .suggestion("Did you forget to provide the definition(s) to operate on?")
-            .suggestion("Alternatively, if you meant to build all containers, pass the -a/--all and/or -f/--force flags.");
+            .suggestion("Alternatively, if you meant to build all definiitions, pass the -a/--all and/or -f/--force flags.");
 
         return Err(err);
     }
 
-    let set: Vec<_> = match force {
-        false => {
-            // Filter unchanged
-            // Error if no changed
-            todo!()
-        },
-        true  => set
-    };
+    debug!(
+        "Finished build set enumeration - got {} (all: {all})\n{set:#?}",
+        set.len()
+    );
+
+    debug!("Resolving dependencies...");
     
-    // Screen for duplicates
+    let mut names: HashSet<_> = set
+        .iter()
+        .map(Definition::name)
+        .collect();
 
-    // Also needed is a dependency resolution algorithm.
-    // Given a graph containing an arbitrary number of disjoint subgraphs (each of which may have 1 or more members)
-    // we must:
-    // - Identify and extract all disjoint subgraphs (repeated D/BFS should do the trick)
-    // - Ensure that all multi-member subgraphs are acyclic (and have no "broken edges")
-    // - Convert all subgraphs into queues that respect encoded dependency relationships
-    // Canonical algorithm: topological sort
-    //
-    // Also note that when working in non-force contexts, we _must_ handle the case
-    // where we have an _unchanged_ definition with _changed_ dependencies.
-    // Possible solution: hash XOR of all dependencies.
+    let mut deps = vec![];
 
-    // Perform builds
+    for name in set
+        .iter()
+        .flat_map(Definition::depends_on)
+        .map(String::as_str)
+    {
+        if names.contains(name) {
+            continue;
+        }
+        
+        let def = Definition::find(name)
+            .context("Fault when searching for definition dependency")?;
+
+        debug!(
+            "Fetched dependency {:?}",
+            def
+        );
+
+        deps.push(def);
+        names.insert(name);
+    }
+
+    set.extend(deps);
+
+    debug!(
+        "Finished fetching dependencies - now working with {}\n{set:#?}",
+        set.len()
+    );
+
+    let mut indices = HashMap::new();
+    let mut graph   = Graph::<Definition, ()>::new();
+
+    for def in set {
+        indices.insert(
+            def.name().to_owned(),
+            graph.add_node(def)
+        );
+    }
+
+    for idx in graph.node_indices() {
+        // Borrow check complains about an immutable borrow
+        // on the graph if we don't clone the dependencies.
+        #[allow(clippy::unnecessary_to_owned)]
+        for dep in graph[idx].depends_on().to_vec() {
+            graph.update_edge(
+                idx,
+                indices[&dep],
+                ()
+            );
+        }
+    }
+
+    debug!("Topologically sorting build set...");
+
+    let topo = toposort(&graph, None)
+        .map_err(|e| eyre!{"{e:?}"})
+        .context("Cycle detected in definition dependency graph")?;
+    
+    debug!("Finished topologically sorting build set");
+    
+    if !force {
+        for idx in topo {
+            graph[idx].build()?;
+        }
+
+        debug!("Finished building definition set!");
+
+        return Ok(());
+    }
+
+    // To identify changes (only applies if -f is not set):
+    // - Try and find the corresponding image to a definition
+    // - If one does not exist, mark it as "changed"
+    // - If one does exist, fetch both the individual hash and the dependency hash
+    // - If the individual hash is different, mark it as changed
+    // - Otherwise, compute the dependency hash by XOR'ing together the hashes of all dependencies; if they differ, mark as changed.
+    // - If none of the above hit, skip.
+
     Ok(())
 }

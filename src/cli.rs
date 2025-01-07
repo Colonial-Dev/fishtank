@@ -32,6 +32,8 @@ pub enum Command {
     Create { name: String },
     /// Edit an existing container definition.
     Edit   { name: String },
+    /// Delete a container definition.
+    Delete { name: String },
     /// Invoke $SHELL inside a container.
     Enter  { name: String },
     /// Execute a command inside a container.
@@ -83,5 +85,8 @@ pub enum Command {
         shell: String,
     },
     #[clap(hide = true)]
-    Config,
+    Config {
+        operation : String,
+        rest      : Vec<String>, 
+    }
 }

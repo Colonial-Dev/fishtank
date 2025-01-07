@@ -11,12 +11,12 @@ mod prelude {
     
     pub use color_eyre::{
         Result,
+        Report,
         Section,
-        SectionExt
+        SectionExt,
     };
 
     pub use log::{
-        trace,
         debug,
         info,
         warn,
@@ -25,6 +25,7 @@ mod prelude {
 }
 
 use prelude::*;
+use build::*;
 use cli::*;
 use podman::*;
 
@@ -34,6 +35,7 @@ pub const REPOSITORY : &str = env!("CARGO_PKG_REPOSITORY");
 
 fn main() -> Result<()> {
     use clap::Parser;
+    use Command::*;
 
     let args = Cli::parse();
 
@@ -57,7 +59,23 @@ fn main() -> Result<()> {
     ensure("podman")?;
     ensure("buildah")?;
 
-    // match args.command
+    match args.command {
+        Containers => list_containers()?,
+        Images     => list_images()?,
+
+        Create { name } => Definition::create(name)?,
+        Edit   { name } => Definition::edit(name)?,
+        Delete { name } => Definition::delete(name)?,
+
+
+
+        Init { shell } => match &*shell {
+            "fish"  => init_fish(),
+            "posix" => init_posix(),
+            _       => unreachable!()
+        },
+        _ => todo!()
+    }
 
     Ok(())
 }
@@ -131,6 +149,26 @@ fn ensure(program: &str) -> Result<()> {
             Err(err)
         }
     }
+}
+
+fn list_containers() -> Result<()> {
+    Ok(())
+}
+
+fn list_images() -> Result<()> {
+    Ok(())
+}
+
+fn init_posix() {
+    print!(
+        include_str!("shell/setup.sh")
+    )
+}
+
+fn init_fish() {
+    print!(
+        include_str!("shell/setup.fish")
+    )
 }
 
 fn install_logging() {
