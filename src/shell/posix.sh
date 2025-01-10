@@ -4,10 +4,6 @@ buildah() {
     if [ "$1" = 'from' ]; then
         ctr=$(command buildah "$@")
         
-        if [ $? -ne 0 ]; then
-            exit $?
-        fi
-        
         buildah config \
             -a manager=box \
             -a box.path=$__BOX_BUILD_PATH \
@@ -20,15 +16,15 @@ buildah() {
         echo "$ctr"
     else
         command buildah "$@"
-        
-        if [ $? -ne 0 ]; then
-            exit $?
-        fi
     fi
 }
 
 FROM() {
     buildah from "$@"
+}
+
+COMMIT() {
+    buildah commit "$@"
 }
 
 RUN() {
@@ -44,35 +40,35 @@ COPY() {
 }
 
 CMD() {
-    bx config cmd "$@"
+    buildah config --cmd "$@" $__BOX_BUILD_CTR
 }
 
 LABEL() {
-    bx config label "$@"
+    buildah config --label "$@" $__BOX_BUILD_CTR
 }
 
 EXPOSE() {
-    bx config expose "$@"
+    buildah config --port "$@" $__BOX_BUILD_CTR
 }
 
 ENV() {
-    bx config env "$@"
+    buildah config --env "$@" $__BOX_BUILD_CTR
 }
 
 ENTRYPOINT() {
-    bx config entrypoint "$@"
+    buildah config --entrypoint "$@" $__BOX_BUILD_CTR
 }
 
 VOLUME() {
-    bx config volume "$@"
+    buildah config --volume "$@" $__BOX_BUILD_CTR
 }
 
 USER() {
-    bx config user "$@"
+    buildah config --user "$@" $__BOX_BUILD_CTR
 }
 
 WORKDIR() {
-    bx config workdir "$@"
+    buildah config --workingdir "$@" $__BOX_BUILD_CTR
 }
 
 PRESET() {

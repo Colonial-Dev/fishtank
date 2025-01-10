@@ -43,6 +43,10 @@ function FROM
     buildah from $argv
 end
 
+function COMMIT
+    buildah commit $argv
+end
+
 function RUN
     bx config run $argv
 end
@@ -56,35 +60,35 @@ function COPY
 end
 
 function CMD
-    bx config cmd $argv
+    buildah config --cmd $argv $__BOX_BUILD_CTR
 end
 
 function LABEL
-    bx config label $argv
+    buildah config --label $argv $__BOX_BUILD_CTR
 end
 
 function EXPOSE
-    bx config expose $argv
+    buildah config --port $argv $__BOX_BUILD_CTR
 end
 
 function ENV
-    bx config env $argv
+    buildah config --env $argv $__BOX_BUILD_CTR
 end
 
 function ENTRYPOINT
-    bx config entrypoint $argv
+    buildah config --entrypoint $argv $__BOX_BUILD_CTR
 end
 
 function VOLUME
-    bx config volume $argv
+    buildah config --volume $argv $__BOX_BUILD_CTR
 end
 
 function USER
-    bx config user $argv
+    buildah config --user $argv $__BOX_BUILD_CTR
 end
 
 function WORKDIR
-    bx config workdir $argv
+    buildah config --workingdir $argv $__BOX_BUILD_CTR
 end
 
 function PRESET

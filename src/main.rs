@@ -97,16 +97,66 @@ fn main() -> Result<()> {
         Down    (set) => retrieve_set(&set)?.iter().try_for_each(Container::down)?,
         Reup    (set) => retrieve_set(&set)?.iter().try_for_each(Container::reup)?,
 
-        // Up      (set) => retrieve_set(&set)?.iter().try_for_each(Container::up)?,
+        Up { containers, all, replace } => {
+            let set: Vec<_> = match all {
+                false => {
+                    let mut out = vec![];
 
+                    for id in containers {
+                        out.push(
+                            Image::from_id(&id)?
+                        )
+                    }
+
+                    out
+                },
+                true => Image::enumerate()?
+            };
+
+            for image in set {
+                image.instantiate(replace)?;
+            }
+        }
 
         Init { shell } => match &*shell {
             "fish"  => init_fish(),
             "posix" => init_posix(),
             _       => unreachable!()
         },
-        Config { operation, rest } => match operation {
-            _ => todo!()
+        Config { operation, args, rest } => {
+            use std::process::Command;
+
+            let Ok(ctr) = std::env::var("__BOX_BUILD_CTR") else {
+                let err = eyre!("Config command must be invoked inside of a build context")
+                    .suggestion("This is probably happening due to an issue with a FROM directive.")
+                    .suggestion("Alternately, it may be a bug in Box.");
+
+                return Err(err);
+            };
+
+            match operation.as_str() {
+                "run" => {
+                    Command::new("buildah")
+                        .arg("run")
+                        .args(args)
+                        .arg("--")
+                        .arg(ctr)
+                        .args(rest)
+                        .spawn_ok()?
+                }
+                "add" => {
+                    Command::new("buildah")
+                        .arg("add")
+                        .args(args)
+                        .arg(ctr)
+                        .args(rest)
+                        .spawn_ok()?
+                }
+                "preset" => {
+                    todo!()
+                }
+                _ => unreachable!()
+            }
         },
         _ => todo!()
     }
@@ -205,15 +255,17 @@ fn list_images() -> Result<()> {
 }
 
 fn init_posix() {
-    //print!(
-    //    include_str!("shell/posix.sh")
-    //)
+    print!(
+        "{}",
+        include_str!("shell/posix.sh")
+    )
 }
 
 fn init_fish() {
-    //print!(
-    //    include_str!("shell/fish.sh")
-    //)
+    print!(
+        "{}",
+        include_str!("shell/fish.sh")
+    )
 }
 
 pub trait CommandExt {
@@ -221,6 +273,12 @@ pub trait CommandExt {
     /// 
     /// Wraps `output` to return either a (lossy) UTF-8 string of standard output _or_ a well-formatted error.
     fn output_ok(&mut self) -> Result<String>;
+
+    /// Extension method.
+    /// 
+    /// Wraps `spawn` and `wait` to return an `Err` on non-zero exit codes without capturing the
+    /// standard streams.
+    fn spawn_ok(&mut self) -> Result<()>;
 }
 
 impl CommandExt for std::process::Command {
@@ -259,6 +317,42 @@ impl CommandExt for std::process::Command {
                 .note("This is likely due to invalid input or a bug in Box.");
     
             Err(err)
+        }
+    }
+
+    fn spawn_ok(&mut self) -> Result<()> {
+        debug!("Shelling out; command is {self:?}");
+
+        let make_message = |c: &std::process::Command| {
+            let arguments = format!(
+                "{:?} {:?}",
+                c.get_program(),
+                c.get_args()
+            ).header("Arguments:");
+    
+            let err = eyre!("command invocation failed")
+                .section(arguments)
+                .note("This is likely due to invalid input or a bug in Box.");
+    
+            Err(err)
+        };
+
+        let Ok(mut child) = self.spawn() else {
+            return make_message(self)
+                .context("Fault when spawning command")
+        };
+
+        let Ok(status) = child.wait() else {
+            return make_message(self)
+                .context("Fault when running command")
+        };        
+
+        if status.success() {
+            Ok(())
+        }
+        else {
+            make_message(self)
+                .context("Command returned non-zero exit code")
         }
     }
 }

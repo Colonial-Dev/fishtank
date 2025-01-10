@@ -16,6 +16,7 @@ lto           = true
 # Command line.
 clap = { version = "4.5.23", features = ["derive"] }
 nucleo-matcher = "0.3.1"
+dialoguer = "0.11.0"
 
 # Logging and error reporting
 color-eyre = "0.6.3"

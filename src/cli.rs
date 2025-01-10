@@ -96,6 +96,8 @@ pub enum Command {
     #[clap(hide = true)]
     Config {
         operation : String,
+        args      : Vec<String>,
+        #[arg(last = true)]
         rest      : Vec<String>, 
     }
 }

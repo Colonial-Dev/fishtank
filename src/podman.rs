@@ -335,10 +335,7 @@ impl Image {
             .arg(format!("box.name={name}"))
             .arg("--annotation")
             .arg(format!("box.hash={hash}"))
-            .spawn()
-            .context("Fault when spawning image instantiation")?
-            // FIXME wait does not Err on a non-zero exit code
-            .wait()
+            .spawn_ok()
             .context("Fault when instantiating image")?;
         
         Ok(())

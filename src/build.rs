@@ -227,9 +227,7 @@ impl Definition {
                     "__BOX_BUILD_NAME",
                     self.name()
                 )
-                .spawn()
-                .context("Fault when spawning Fish-based definition")?
-                .wait()
+                .spawn_ok()
                 .context("Fault when evaluating Fish-based definition")?;
         }
         else {
@@ -266,9 +264,7 @@ impl Definition {
                     "__BOX_BUILD_NAME",
                     self.name()
                 )
-                .spawn()
-                .context("Fault when spawning POSIX-based definition")?
-                .wait()
+                .spawn_ok()
                 .context("Fault when evaluating POSIX-based definition")?;
         }
         
@@ -314,9 +310,8 @@ impl Definition {
             .arg(name)
             .arg("--file")
             .arg(path)
-            .spawn()
-            .context("Fault when spawning Containerfile-based definition")?
-            .wait()?;
+            .spawn_ok()
+            .context("Fault when evaluating Containerfile-based definition")?;
 
         Ok(())
     }
