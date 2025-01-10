@@ -59,6 +59,23 @@ fn main() -> Result<()> {
     ensure("podman")?;
     ensure("buildah")?;
 
+    let retrieve_set = |set: &ContainerSet| match set.all {
+        false => {
+            let mut out = vec![];
+
+            for id in &set.containers {
+                existence_check(id)?;
+
+                out.push(
+                    Container::from_id(id)?
+                )
+            }
+            
+            Ok(out)
+        },
+        true  => Container::enumerate(),
+    };
+
     match args.command {
         Containers => list_containers()?,
         Images     => list_images()?,
@@ -67,6 +84,20 @@ fn main() -> Result<()> {
         Edit   { name } => Definition::edit(name)?,
         Delete { name } => Definition::delete(name)?,
 
+        // Enter
+        // Exec
+        // Ephemeral
+
+        Build { defs, all, force } => build_set(&defs, all, force)?,
+
+
+        Start   (set) => retrieve_set(&set)?.iter().try_for_each(Container::start)?,
+        Stop    (set) => retrieve_set(&set)?.iter().try_for_each(Container::stop)?,
+        Restart (set) => retrieve_set(&set)?.iter().try_for_each(Container::restart)?,
+        Down    (set) => retrieve_set(&set)?.iter().try_for_each(Container::down)?,
+        Reup    (set) => retrieve_set(&set)?.iter().try_for_each(Container::reup)?,
+
+        // Up      (set) => retrieve_set(&set)?.iter().try_for_each(Container::up)?,
 
 
         Init { shell } => match &*shell {
@@ -74,10 +105,24 @@ fn main() -> Result<()> {
             "posix" => init_posix(),
             _       => unreachable!()
         },
+        Config { operation, rest } => match operation {
+            _ => todo!()
+        },
         _ => todo!()
     }
 
     Ok(())
+}
+
+fn install_logging() {
+    env_logger::init();
+
+    color_eyre::config::HookBuilder::new()
+        .panic_section("Well, this is embarassing. It appears Box has crashed!\nConsider reporting the bug at <https://github.com/Colonial-Dev/box>.")
+        .capture_span_trace_by_default(true)
+        .display_location_section(false)
+        .install()
+        .expect("Could not install Eyre hooks!");
 }
 
 /// Checks if a container exists, returning a well-formed error (with fuzzy-matched suggestions) if not.
@@ -160,24 +205,60 @@ fn list_images() -> Result<()> {
 }
 
 fn init_posix() {
-    print!(
-        include_str!("shell/setup.sh")
-    )
+    //print!(
+    //    include_str!("shell/posix.sh")
+    //)
 }
 
 fn init_fish() {
-    print!(
-        include_str!("shell/setup.fish")
-    )
+    //print!(
+    //    include_str!("shell/fish.sh")
+    //)
 }
 
-fn install_logging() {
-    env_logger::init();
+pub trait CommandExt {
+    /// Extension method.
+    /// 
+    /// Wraps `output` to return either a (lossy) UTF-8 string of standard output _or_ a well-formatted error.
+    fn output_ok(&mut self) -> Result<String>;
+}
 
-    color_eyre::config::HookBuilder::new()
-        .panic_section("Well, this is embarassing. It appears Box has crashed!\nConsider reporting the bug at <https://github.com/Colonial-Dev/box>.")
-        .capture_span_trace_by_default(true)
-        .display_location_section(false)
-        .install()
-        .expect("Could not install Eyre hooks!");
+impl CommandExt for std::process::Command {
+    fn output_ok(&mut self) -> Result<String> {
+        debug!("Shelling out; command is {self:?}");
+        
+        let o = self.output()?;
+    
+        if o.status.success() {
+            let stdout = String::from_utf8_lossy(&o.stdout)
+                .to_string();
+            
+            Ok(stdout)
+        }
+        else {
+            error!("Command invocation failed!");
+
+            let arguments = format!(
+                "{:?} {:?}",
+                self.get_program(),
+                self.get_args()
+            ).header("Arguments:");
+    
+            let stderr = String::from_utf8_lossy(&o.stderr)
+                .to_string()
+                .header("Standard error:");
+    
+            let stdout = String::from_utf8_lossy(&o.stdout)
+                .to_string()
+                .header("Standard output:");
+    
+            let err = eyre!("command invocation failed")
+                .section(arguments)
+                .section(stderr)
+                .section(stdout)
+                .note("This is likely due to invalid input or a bug in Box.");
+    
+            Err(err)
+        }
+    }
 }

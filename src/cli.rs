@@ -74,7 +74,16 @@ pub enum Command {
     /// Restart managed container(s).
     Restart (ContainerSet),
     /// Create managed container(s).
-    Up      (ContainerSet),
+    Up {
+        /// One or more images; can use names and IDs interchangeably.
+        containers: Vec<String>,
+        /// Whether or not to operate on *all* images.
+        #[arg(short, long)]
+        all: bool,
+        /// Whether or not to replace existing containers.
+        #[arg(short, long)]
+        replace: bool,
+    },
     /// Remove managed container(s).
     Down    (ContainerSet),
     /// Remove and re-create managed container(s).

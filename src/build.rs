@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use serde::Deserialize;
 
 use crate::prelude::*;
-
-// metadata.is_file() && permissions.mode() & 0o111 != 0
+use crate::podman::*;
+use crate::CommandExt;
 
 // For POSIX shells - build a script "on the fly" that sources the init using `source <(bx _init posix)`
 // then executes the script in a subshell
@@ -21,7 +22,9 @@ pub type Definitions = Vec<Definition>;
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Definition {
     pub path: PathBuf,
+    pub bang: String,
     pub hash: u64,
+    pub tree: u64,
     pub meta: Metadata,
 }
 
@@ -56,12 +59,10 @@ impl Definition {
             }
 
             if entry.path().extension() == OsStr::new("box").into() {
-                continue;
+                out.push(
+                    Definition::from_path(entry.path())
+                )            
             }
-
-            out.push(
-                Definition::from_path(entry.path())
-            )
         }
 
         let (defs, errors): (Vec<_>, Vec<_>) = out
@@ -143,11 +144,17 @@ impl Definition {
             .context("Failed to read in definition data")
             .suggestion("Do you have permission issues or non-UTF-8 data?")?;
 
+        let bang = data 
+            .lines()
+            .next()
+            .context("Encountered an empty definition")?
+            .to_owned();
+
         let meta = data
             .lines()
             .filter(|l| l.starts_with("#~"))
             .fold(String::new(), |mut acc, line| {
-                acc += line;
+                acc += line.trim_start_matches("#~").trim();
                 acc += "\n";
                 acc
             });
@@ -160,8 +167,10 @@ impl Definition {
         let hash = seahash::hash(
             data.as_bytes()
         );
+
+        let tree = hash;
         
-        Ok(Self { path, hash, meta })
+        Ok(Self { path, bang, hash, tree, meta })
     }
 
     pub fn name(&self) -> &str {
@@ -179,20 +188,135 @@ impl Definition {
     }
 
     pub fn build(&self) -> Result<()> {
+        use std::fs;
+
         info!(
             "Building definition at path {:?}...",
             &self.path
         );
 
-        // Branch on Fish | POSIX | Containerfile
-        // - IF metadata has 'containerfile = true' then branch
-        // - EIF metadata has a shebang containing 'fish' then branch
-        // - E assume POSIX
+        if self.meta.containerfile {
+            self.build_containerfile()?;
+        }
+        else if self.bang.contains("fish") {
+            Command::new("fish")
+                .arg("-C")
+                .arg("bx init fish | source")
+                .arg(&self.path)
+                .env(
+                    "__BOX_BUILD_PATH",
+                    &self.path
+                )
+                .env(
+                    "__BOX_BUILD_DIR",
+                    {
+                        let mut p = self.path.to_owned();
+                        p.pop();
+                        p
+                    }
+                )
+                .env(
+                    "__BOX_BUILD_HASH",
+                    format!("{:x}", self.hash)
+                )
+                .env(
+                    "__BOX_BUILD_TREE",
+                    format!("{:x}", self.tree)
+                )
+                .env(
+                    "__BOX_BUILD_NAME",
+                    self.name()
+                )
+                .spawn()
+                .context("Fault when spawning Fish-based definition")?
+                .wait()
+                .context("Fault when evaluating Fish-based definition")?;
+        }
+        else {
+            let script = format!(
+                "source <(bx init posix)\n(\n{}\n)",
+                fs::read_to_string(&self.path)
+                    .context("Fault when reading in POSIX-based definition")?
+            );
 
-        info!(
-            "Finished building definition at path {:?}",
-            &self.path
+            Command::new("sh")
+                .arg("-c")
+                .arg(script)
+                .env(
+                    "__BOX_BUILD_PATH",
+                    &self.path
+                )
+                .env(
+                    "__BOX_BUILD_DIR",
+                    {
+                        let mut p = self.path.to_owned();
+                        p.pop();
+                        p
+                    }
+                )
+                .env(
+                    "__BOX_BUILD_HASH",
+                    format!("{:x}", self.hash)
+                )
+                .env(
+                    "__BOX_BUILD_TREE",
+                    format!("{:x}", self.tree)
+                )
+                .env(
+                    "__BOX_BUILD_NAME",
+                    self.name()
+                )
+                .spawn()
+                .context("Fault when spawning POSIX-based definition")?
+                .wait()
+                .context("Fault when evaluating POSIX-based definition")?;
+        }
+        
+        Ok(())
+    }
+
+    fn build_containerfile(&self) -> Result<()> {
+        let path = format!(
+            "box.path={}",
+            self.path.to_string_lossy()
         );
+
+        let name = format!(
+            "box.name={}",
+            self.name()
+        );
+
+        let hash = format!(
+            "box.hash={:x}",
+            self.hash
+        );
+
+        let tree = format!(
+            "box.tree={:x}",
+            self.tree
+        );
+
+        Command::new("podman")
+            .args([
+                "build",
+                "pull", "--newer",
+                "--annotation", "manager=box",
+            ])
+            .arg("--annotation")
+            .arg(&path)
+            .arg("--annotation")
+            .arg(&name)
+            .arg("--annotation")
+            .arg(hash)
+            .arg("--annotation")
+            .arg(tree)
+            .arg("--tag")
+            .arg(name)
+            .arg("--file")
+            .arg(path)
+            .spawn()
+            .context("Fault when spawning Containerfile-based definition")?
+            .wait()?;
 
         Ok(())
     }
@@ -336,7 +460,7 @@ pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
     if set.is_empty() {
         let err = eyre!("No definitions found")
             .suggestion("Did you forget to provide the definition(s) to operate on?")
-            .suggestion("Alternatively, if you meant to build all definiitions, pass the -a/--all and/or -f/--force flags.");
+            .suggestion("Alternatively, if you meant to build all definiitions, pass the -a/--all flag.");
 
         return Err(err);
     }
@@ -398,11 +522,24 @@ pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
         // on the graph if we don't clone the dependencies.
         #[allow(clippy::unnecessary_to_owned)]
         for dep in graph[idx].depends_on().to_vec() {
+            // We (counter-intuitively, at least to me)
+            // insert edges in reverse; otherwise, the final
+            // topological sort is invalid.
             graph.update_edge(
-                idx,
                 indices[&dep],
+                idx,
                 ()
             );
+        }
+    }
+
+    debug!("Walking set graph to compute tree hashes for each definition...");
+
+    for idx in graph.node_indices() {
+        let mut search = Dfs::new(&graph, idx);
+
+        while let Some(nx) = search.next(&graph) {
+            graph[idx].tree ^= graph[nx].hash;
         }
     }
 
@@ -411,9 +548,7 @@ pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
     let topo = toposort(&graph, None)
         .map_err(|e| eyre!{"{e:?}"})
         .context("Cycle detected in definition dependency graph")?;
-    
-    debug!("Finished topologically sorting build set");
-    
+        
     if !force {
         for idx in topo {
             graph[idx].build()?;
@@ -424,13 +559,44 @@ pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
         return Ok(());
     }
 
-    // To identify changes (only applies if -f is not set):
-    // - Try and find the corresponding image to a definition
-    // - If one does not exist, mark it as "changed"
-    // - If one does exist, fetch both the individual hash and the dependency hash
-    // - If the individual hash is different, mark it as changed
-    // - Otherwise, compute the dependency hash by XOR'ing together the hashes of all dependencies; if they differ, mark as changed.
-    // - If none of the above hit, skip.
+    let to_u64 = |s| u64::from_str_radix(s, 16)
+        .expect("Hash annotation should be a 64-bit hexadecimal number");
+
+    let path_hash: HashMap<_, _> = Image::enumerate()
+        .context("Fault when enumerating images for change detection")?
+        .iter()
+        .map(|i| 
+            (
+                i.annotation("box.path")
+                    .map(PathBuf::from)
+                    .expect("Path annotation should be set"),
+                (
+                    i.annotation("box.hash")
+                        .map(to_u64)
+                        .expect("Hash annotation should be set"),
+                    i.annotation("box.tree")
+                        .map(to_u64)
+                        .expect("Tree hash annotation should be set")
+                )
+            )
+        )
+        .collect();
+
+    for idx in topo {
+        let def = &graph[idx];
+
+        // If no image with a corresponding path exists, build.
+        let Some(hashes) = path_hash.get(&def.path) else {
+            def.build()?;
+            continue
+        };
+
+        let (own, tree) = hashes;
+        
+        if *own != def.hash || *tree != def.tree {
+            def.build()?;
+        }
+    }
 
     Ok(())
 }

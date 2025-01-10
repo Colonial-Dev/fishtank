@@ -31,10 +31,11 @@ Before installing, make sure you have `podman` and a supported shell (either `fi
 
 ## Getting Started
 
-Fishtank requires a definition ("tank") for each container you'd like to create. Definitions can be in two different formats:
-- Standard Container/Dockerfiles - just add `# fishtank containerfile` to the text and you're good to go.
-- `fish` shell scripts that run in a special harness. This injects additional functions and wraps a few others to provide additional functionality not present in Containerfiles, like the ability to declare runtime arguments such as mounts.
+Box requires a definition for each container you'd like to create. Definitions can be in two different formats:
+- Standard Container/Dockerfiles - just add `#~ containerfile = true` to the text and you're good to go.
+- Shell scripts (POSIX or `fish`) that run in a special harness. This injects additional functions and wraps a few others to provide additional functionality not present in Containerfiles, like the ability to declare runtime arguments such as mounts.
 
+TODO update
 Either type must be stored under `$XDG_CONFIG_HOME/fishtank/` (typically `~/.config/fishtank/`) with the file extension `.tank`.
 
 To create and edit a new definition, you can simply run `tankctl create <NAME>`. This will create the file and open it using your `$EDITOR`.
@@ -207,13 +208,6 @@ buildah commit $ctr jellyfin
 
 ## FAQ
 
-### "Why `fish` instead of POSIX `sh`?"
-Well, I *could* have written Fishtank in POSIX `sh` - in the same sense that I *could* stick a fork into my eye repeatedly.
-
-More seriously - I started this as an excuse to learn some scripting after migrating from `bash` to `fish`, and it matured into something I thought others might find useful.
-
-If you prefer a different shell, you can still use Fishtank! The scripts are self-contained and properly shebanged, so simply installing `fish` and placing them somewhere in your `$PATH` should work fine.
-
 ### "How does this compare to Toolbx or Distrobox?"
 It depends!
 
@@ -222,21 +216,31 @@ I used to heavily rely on Toolbx for my development environments, and I also dab
 - Toolbx automatically runs as `--privileged` with (among other things) your entire `$HOME` and `$XDG_RUNTIME_DIR` mounted into the container, and offers no way to opt-out.
 - Distrobox is similar, but does offer some opt-outs. You can also choose to use an alternate `$HOME` on the host (not inside the container.)
 
-Fishtank, by contrast, is entirely opt-in when it comes to host integrations. You get to choose precisely what (if anything) is shared.
+Box, by contrast, is entirely opt-in when it comes to host integrations. You get to choose precisely what (if anything) is shared.
 
-Fishtank also requires that every container be associated with a "definition," rather than defaulting to a standard "toolbox" image for each container. These can either be standard Containerfiles, or they can use Fishtank's custom shell-based format to declare runtime arguments (like mounts)[^3] during build time.
+Box also requires that every container be associated with a "definition," rather than defaulting to a standard "toolbox" image for each container. These can either be standard Containerfiles, or they can use Box's custom shell-based format to declare runtime arguments (like mounts)[^3] during build time.
 
 So:
 - If you don't mind the above caveats and want containerized environments that Just Work with the host, use Toolbx or Distrobox.
-- If you *do* mind the above caveats and/or want some declarative-ness in your containers, give Fishtank a try.
+- If you *do* mind the above caveats and/or want some declarative-ness in your containers, give Box a try.
 
 
 ### "Why not just use Kubernetes YAML or `compose`?"
 A few reasons:
 
-1. Separating the information on how to *build* the image from information on how to *run* it is lame, especially for Fishtank's target use case of "bespoke interactive containers."
+1. Separating the information on how to *build* the image from information on how to *run* it is lame, especially for Box's target use case of "bespoke interactive containers."
 2. Kubernetes YAML is massively overcomplicated, and the `podman` version of `compose` was somewhat buggy when I tried it.
 3. YAML sucks.
+
+### "Why Rust?"
+It's my favorite out of the "good for command-line" language pantheon.
+
+The main requirements were:
+- Quick, especially at startup.
+- Space efficient.
+- No runtime dependencies apart from the `podman` suite.
+
+A fast, small, and self-contained binary is one that I can commit to my `dotfiles` repository and forget about.
 
 [^1]: Only ~1000 lines of pure Fish shell code.
 

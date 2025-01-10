@@ -4,9 +4,25 @@ use std::process::Command;
 use serde::Deserialize;
 
 use crate::prelude::*;
+use crate::CommandExt;
 
 pub type Containers = Vec<Container>;
 pub type Images     = Vec<Image>;
+
+const ANNOTATIONS: [&str; 12] = [
+    "args",
+    "cap-add",
+    "cap-drop",
+    "cpus",
+    "memory",
+    "ulimit",
+    "device",
+    "userns",
+    "security-opt",
+    "mount",
+    "restart",
+    "secret"
+];
 
 #[derive(Debug)]
 pub struct Container {
@@ -177,7 +193,7 @@ impl Container {
         Ok(())
     }
 
-    pub fn remove(&self) -> Result<()> {
+    pub fn down(&self) -> Result<()> {
         debug!("Removing container {}...", self.id);
         
         Command::new("podman")
@@ -191,6 +207,10 @@ impl Container {
            .context("Failed to remove container")?;
 
         Ok(())
+    }
+
+    pub fn reup(&self) -> Result<()> {
+        todo!()
     }
 }
 
@@ -259,6 +279,71 @@ impl Image {
         Ok(out)
     }
 
+    pub fn instantiate(&self, replace: bool) -> Result<()> {
+        let name = self.annotation("box.name")
+            .expect("Name annotation should be set");
+
+        let hash = self.annotation("box.hash")
+            .expect("Hash annotation should be set");
+
+        let mut args = vec![];
+
+        for a in ANNOTATIONS {
+            let key = format!("box.{a}");
+            
+            let Some(value) = self.annotation(&key) else {
+                continue
+            };
+
+            let flag = format!("--{a}");
+
+            for v in value.split('\x1F') {
+                args.push(flag.clone());
+                args.push(v.to_owned());
+            }
+        }
+
+        if let Some(value) = self.annotation("box.args") {
+            for v in value.split('\x1F') {
+                args.push(
+                    v.to_owned()
+                )
+            }
+        }
+
+        if replace {
+            args.push(
+                "--replace".to_owned()
+            )
+        }
+
+        Command::new("podman")
+            .arg("--run")
+            .arg("-d")
+            .args([
+                "--name",
+                name,
+                "--hostname",
+                name,
+            ])
+            .args(args)
+            .args([
+                "--annotation",
+                "manager=box"
+            ])
+            .arg("--annotation")
+            .arg(format!("box.name={name}"))
+            .arg("--annotation")
+            .arg(format!("box.hash={hash}"))
+            .spawn()
+            .context("Fault when spawning image instantiation")?
+            // FIXME wait does not Err on a non-zero exit code
+            .wait()
+            .context("Fault when instantiating image")?;
+        
+        Ok(())
+    }
+
     pub fn exists(id: &str) -> Result<bool> {
         let output = Command::new("podman")
             .args([
@@ -279,54 +364,5 @@ impl Image {
             .annotations
             .get(key)
             .map(String::as_str)
-    }
-}
-
-// TODO Create new containers from managed images.
-
-trait CommandExt {
-    /// Extension method.
-    /// 
-    /// Wraps `output` to return either a (lossy) UTF-8 string of standard output _or_ a well-formatted error.
-    fn output_ok(&mut self) -> Result<String>;
-}
-
-impl CommandExt for Command {
-    fn output_ok(&mut self) -> Result<String> {
-        debug!("Shelling out; command is {self:?}");
-        
-        let o = self.output()?;
-    
-        if o.status.success() {
-            let stdout = String::from_utf8_lossy(&o.stdout)
-                .to_string();
-            
-            Ok(stdout)
-        }
-        else {
-            error!("Command invocation failed!");
-
-            let arguments = format!(
-                "{:?} {:?}",
-                self.get_program(),
-                self.get_args()
-            ).header("Arguments:");
-    
-            let stderr = String::from_utf8_lossy(&o.stderr)
-                .to_string()
-                .header("Standard error:");
-    
-            let stdout = String::from_utf8_lossy(&o.stdout)
-                .to_string()
-                .header("Standard output:");
-    
-            let err = eyre!("command invocation failed")
-                .section(arguments)
-                .section(stderr)
-                .section(stdout)
-                .note("This is likely due to invalid input or a bug in Box.");
-    
-            Err(err)
-        }
     }
 }
