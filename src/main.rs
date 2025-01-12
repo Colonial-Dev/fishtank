@@ -5,6 +5,7 @@ mod podman;
 mod prelude {
     pub use color_eyre::eyre::{
         eyre,
+        bail,
         Context as EyreContext,
         ContextCompat
     };
@@ -29,10 +30,6 @@ use build::*;
 use cli::*;
 use podman::*;
 
-pub const VERSION    : &str = env!("CARGO_PKG_VERSION");
-pub const AUTHORS    : &str = env!("CARGO_PKG_AUTHORS");
-pub const REPOSITORY : &str = env!("CARGO_PKG_REPOSITORY");
-
 fn main() -> Result<()> {
     use clap::Parser;
     use Command::*;
@@ -51,52 +48,112 @@ fn main() -> Result<()> {
 
     install_logging();
 
-    info!("Box v{VERSION} by {AUTHORS}");
-    info!("This program is licensed under the GNU Affero General Public License, version 3.");
-    info!("See {REPOSITORY} for more information.");
-    info!("Parsed arguments: {args:#?}");
+    info!("Parsed arguments:\n{args:#?}");
 
     ensure("podman")?;
     ensure("buildah")?;
 
-    let retrieve_set = |set: &ContainerSet| match set.all {
-        false => {
-            let mut out = vec![];
+    let map_set = |set: &ContainerSet, func: fn(&Container) -> Result<()>| -> Result<_> {
+        match set.all {
+            false => {
+                for id in &set.containers {
+                    existence_check(id)?;
 
-            for id in &set.containers {
-                existence_check(id)?;
+                    func(
+                        &Container::from_id(id)?
+                    )?;
+                }
+            },
+            true => {
+                for ctr in Container::enumerate()? {
+                    func(&ctr)?;
+                }
+            },
+        };
 
-                out.push(
-                    Container::from_id(id)?
-                )
-            }
-            
-            Ok(out)
-        },
-        true  => Container::enumerate(),
+        Ok(())
     };
 
     match args.command {
-        Containers => list_containers()?,
-        Images     => list_images()?,
+        Containers  => list_containers()?,
+        Definitions => list_definitions()?,
 
         Create { name } => Definition::create(name)?,
         Edit   { name } => Definition::edit(name)?,
-        Delete { name } => Definition::delete(name)?,
+        Delete { name, yes } => Definition::delete(name, yes)?,
 
-        // Enter
-        // Exec
-        // Ephemeral
+        Enter { name } => {
+            use std::process::Command;
+
+            existence_check(&name)?;
+
+            let ctr = Container::from_id(&name)?;
+
+            if !ctr.started() {
+                ctr.start()?;
+            }
+
+            Command::new("podman")
+                .arg("exec")
+                .arg("-it")
+                .arg(name)
+                .arg("sh")
+                .arg("-c")
+                .arg("exec $SHELL")
+                .spawn()
+                .context("Fault when spawning shell inside container")?
+                .wait()?;        },
+        Exec { name, path, args } => {
+            use std::process::Command;
+
+            existence_check(&name)?;
+
+            let ctr = Container::from_id(&name)?;
+
+            if !ctr.started() {
+                ctr.start()?;
+            }
+
+            Command::new("podman")
+                .arg("exec")
+                .arg("-it")
+                .arg(name)
+                .arg(path)
+                .args(args)
+                .spawn()
+                .context("Fault when spawning process inside container")?
+                .wait()?;
+        },
 
         Build { defs, all, force } => build_set(&defs, all, force)?,
 
 
-        Start   (set) => retrieve_set(&set)?.iter().try_for_each(Container::start)?,
-        Stop    (set) => retrieve_set(&set)?.iter().try_for_each(Container::stop)?,
-        Restart (set) => retrieve_set(&set)?.iter().try_for_each(Container::restart)?,
-        Down    (set) => retrieve_set(&set)?.iter().try_for_each(Container::down)?,
-        Reup    (set) => retrieve_set(&set)?.iter().try_for_each(Container::reup)?,
+        Start   (set) => map_set(&set, Container::start)?,
+        Stop    (set) => map_set(&set, Container::stop)?,
+        Restart (set) => map_set(&set, Container::restart)?,
+        Down    (set) => map_set(&set, Container::down)?,
+        Reup    (set) => {
+            map_set(&set, Container::down)?;
 
+            let set: Vec<_> = match set.all {
+                false => {
+                    let mut out = vec![];
+
+                    for id in set.containers {
+                        out.push(
+                            Image::from_id(&id)?
+                        )
+                    }
+                    
+                    out
+                },
+                true => Image::enumerate()?
+            };
+
+            for image in set {
+                image.instantiate(true)?;
+            }
+        },
         Up { containers, all, replace } => {
             let set: Vec<_> = match all {
                 false => {
@@ -107,7 +164,7 @@ fn main() -> Result<()> {
                             Image::from_id(&id)?
                         )
                     }
-
+                    
                     out
                 },
                 true => Image::enumerate()?
@@ -123,7 +180,7 @@ fn main() -> Result<()> {
             "posix" => init_posix(),
             _       => unreachable!()
         },
-        Config { operation, args, rest } => {
+        Config { operation, args } => {
             use std::process::Command;
 
             let Ok(ctr) = std::env::var("__BOX_BUILD_CTR") else {
@@ -133,15 +190,40 @@ fn main() -> Result<()> {
 
                 return Err(err);
             };
+            
+            // Certain operations, like ADD and RUN, need to be split
+            // based on the presence of an '--' arg so they can be re-arranged
+            // appropriately.
+            let (args, trailing) = match args.iter().position(|i| i == "--") {
+                Some(idx) => {
+                    let (l, r) = args.split_at(idx);
+
+                    let r = match r.len() {
+                        0 | 1 => [].as_slice(),
+                        _ => &r[1..]
+                    };
+
+                    (l, r)
+                }
+                None => (
+                    args.as_slice(),
+                    [].as_slice()
+                )
+            };
+
+            debug!("Post-processed arguments: {args:?} // {trailing:?}");
 
             match operation.as_str() {
+                // We handle ADD/COPY and RUN in Rust code,
+                // because correctly handling arguments split by --
+                // in shellcode is... non trivial.
                 "run" => {
                     Command::new("buildah")
                         .arg("run")
-                        .args(args)
-                        .arg("--")
+                        .args(trailing)
                         .arg(ctr)
-                        .args(rest)
+                        .arg("--")
+                        .args(args)
                         .spawn_ok()?
                 }
                 "add" => {
@@ -149,16 +231,46 @@ fn main() -> Result<()> {
                         .arg("add")
                         .args(args)
                         .arg(ctr)
-                        .args(rest)
+                        .args(trailing)
                         .spawn_ok()?
                 }
                 "preset" => {
-                    todo!()
+                    evaluate_preset(&ctr, args)?
+                },
+                o if ANNOTATIONS.contains(&o) => {
+                    let Some(val) = args.first() else {
+                        bail!("Configuration value not specified")
+                    };
+
+                    push_annotation(
+                        &ctr,
+                        &format!("box.{o}"),
+                        val
+                    )?;
+                },
+                o if CONFIG_FLAGS.contains(&o) => {
+                    if args.is_empty() {
+                        bail!("Configuration value not specified")
+                    };
+
+                    Command::new("buildah")
+                        .arg("config")
+                        .arg(
+                            format!("--{o}")
+                        )
+                        .args(args)
+                        .arg(ctr)
+                        .spawn_ok()
+                        .context("Fault when seting build-time configuration flag")?;
+                },
+                _ => {
+                    let err = eyre!("Unknown configuration option {operation}")
+                        .suggestion("Did you make a typo?");
+
+                    return Err(err);
                 }
-                _ => unreachable!()
             }
         },
-        _ => todo!()
     }
 
     Ok(())
@@ -224,7 +336,7 @@ fn ensure(program: &str) -> Result<()> {
         Ok(out) => {
             info!(
                 "Ensured {}",
-                String::from_utf8_lossy(&out.stdout)
+                String::from_utf8_lossy(&out.stdout).trim()
             );
 
             Ok(())
@@ -247,10 +359,65 @@ fn ensure(program: &str) -> Result<()> {
 }
 
 fn list_containers() -> Result<()> {
+    use comfy_table::Table;
+    use comfy_table::presets::UTF8_FULL;
+    use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+
+    let mut table = Table::new();
+    let ctrs      = Container::enumerate()?;
+
+    let rows = ctrs
+        .iter()
+        .map(|c| [
+            c.annotation("box.name").unwrap(),
+            c.image.as_str(),
+            c.state.as_str()
+        ]);
+
+    table
+        .load_preset(UTF8_FULL)
+        .apply_modifier(UTF8_ROUND_CORNERS)
+        .set_header(["Name", "Image", "Status"])
+        .add_rows(rows);
+
+
+    println!("{table}");
+
     Ok(())
 }
 
-fn list_images() -> Result<()> {
+fn list_definitions() -> Result<()> {
+    use comfy_table::Table;
+    use comfy_table::presets::UTF8_FULL;
+    use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+
+    let mut table = Table::new();
+    let defs      = Definition::enumerate()?;
+
+    let rows = defs
+        .iter()
+        .map(|d| [
+            d.name(),
+            if d.meta.containerfile {
+                "Containerfile"
+            }
+            else if d.bang.contains("fish") {
+                "Fish script"
+            }
+            else {
+                "POSIX script"
+            }
+        ]);
+
+    table
+        .load_preset(UTF8_FULL)
+        .apply_modifier(UTF8_ROUND_CORNERS)
+        .set_header(["Name", "Type"])
+        .add_rows(rows);
+
+
+    println!("{table}");
+
     Ok(())
 }
 
@@ -268,6 +435,99 @@ fn init_fish() {
     )
 }
 
+fn evaluate_preset(ctr: &str, args: &[String]) -> Result<()> {
+    use std::ffi::OsString;
+    use std::process::Command;
+
+    let push_annotation = |key: &str, data: &str| {
+        push_annotation(ctr, key, data)
+    };
+
+    let run = |cmd: &str| {
+        Command::new("buildah")
+            .arg("run")
+            .arg(ctr)
+            .arg("sh")
+            .arg("-c")
+            .arg(cmd)
+            .spawn_ok()
+            .context("Fault when running command inside working container")
+    };
+
+    let Some(name) = args.first() else {
+        let err = eyre!("Preset not specified")
+            .suggestion("PRESET directives cannot stand on their own");
+
+        return Err(err)
+    };
+
+    if matches!(name.as_str(), "bind-fix" | "ssh-agent" | "devices") {
+        push_annotation("box.security-opt", "label=disable")?;
+        push_annotation("box.userns", "keep-id")?;
+    }
+
+    match name.as_str() {
+        "cp-user" => {
+            use uzers::os::unix::UserExt;
+
+            let name = match args.get(1) {
+                Some(name) => OsString::from(name),
+                None => uzers::get_current_username()
+                    .expect("Current user should exist")
+            };
+
+            let user = uzers::get_user_by_name(&name)
+                .expect("Current user should exist");
+            
+            let name = name.to_string_lossy();
+
+            let uid = user.uid();
+            let gid = user.primary_group_id();
+            let shl = user.shell().to_string_lossy();
+
+            let scriptlet = format!(
+                "
+                set -eu
+                groupadd -g {gid} {name}
+                useradd -u {uid} -g {gid} -m {name} -s {shl}
+                mkdir -p /etc/sudoers.d
+                echo {name} ALL=\\(root\\) NOPASSWD:ALL > /etc/sudoers.d/{name}
+                chmod 0440 /etc/sudoers.d/{name}
+                "
+            );
+
+            run(&scriptlet)?;
+        }
+        "ssh-agent" => {
+            let sock = std::env::var("SSH_AUTH_SOCK")
+                .context("Could not fetch value of SSH_AUTH_SOCK")
+                .suggestion("Is it set? Some distributions may not run an SSH agent in multi-user mode.")?;
+
+            push_annotation(
+                "box.mount",
+                &format!("type=bind,src={sock},dst={sock}")
+            )?;
+        },
+        "devices" => {
+            warn!("Using 'devices' preset - this will create a privileged container!");
+
+            push_annotation("box.args", "--privileged")?;
+            push_annotation("box.mount", "type=devpts,destination=/dev/pts")?;
+            push_annotation("box.mount", "type=bind,src=/dev,dst=/dev,rslave=true")?;
+        },
+        "bind-fix" => {
+            // No-op. Covered in the blanket case above.
+        }
+        _ => {
+            let err = eyre!("Unrecognized preset {name}")
+                .suggestion("Did you make a typo?");
+
+            return Err(err)
+        }
+    }
+
+    Ok(())
+}
 pub trait CommandExt {
     /// Extension method.
     /// 

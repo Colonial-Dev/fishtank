@@ -9,7 +9,7 @@ use crate::CommandExt;
 pub type Containers = Vec<Container>;
 pub type Images     = Vec<Image>;
 
-const ANNOTATIONS: [&str; 12] = [
+pub const ANNOTATIONS: [&str; 12] = [
     "args",
     "cap-add",
     "cap-drop",
@@ -22,6 +22,18 @@ const ANNOTATIONS: [&str; 12] = [
     "mount",
     "restart",
     "secret"
+];
+
+pub const CONFIG_FLAGS: [&str; 9] = [
+    "entrypoint",
+    "env",
+    "healthcheck",
+    "hostname",
+    "port",
+    "shell",
+    "user",
+    "volume",
+    "workingdir"
 ];
 
 #[derive(Debug)]
@@ -52,7 +64,7 @@ impl Container {
             id    : String,
             #[serde(rename = "State")]
             state : State,
-            #[serde(rename = "Image")]
+            #[serde(rename = "ImageName")]
             image : String,
             #[serde(rename = "Config")]
             config: Config
@@ -208,15 +220,13 @@ impl Container {
 
         Ok(())
     }
-
-    pub fn reup(&self) -> Result<()> {
-        todo!()
-    }
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Image {
+    #[serde(rename = "Id")]
     pub id          : String,
+    #[serde(rename = "Annotations")]
     pub annotations : HashMap<String, String>,
 }
 
@@ -295,19 +305,17 @@ impl Image {
                 continue
             };
 
-            let flag = format!("--{a}");
+            if a == "args" {
+                for v in value.split('\x1F') {
+                    args.push(v.to_owned())
+                }
+            } else {
+                let flag = format!("--{a}");
 
-            for v in value.split('\x1F') {
-                args.push(flag.clone());
-                args.push(v.to_owned());
-            }
-        }
-
-        if let Some(value) = self.annotation("box.args") {
-            for v in value.split('\x1F') {
-                args.push(
-                    v.to_owned()
-                )
+                for v in value.split('\x1F') {
+                    args.push(flag.clone());
+                    args.push(v.to_owned());
+                }
             }
         }
 
@@ -318,7 +326,7 @@ impl Image {
         }
 
         Command::new("podman")
-            .arg("--run")
+            .arg("run")
             .arg("-d")
             .args([
                 "--name",
@@ -335,25 +343,11 @@ impl Image {
             .arg(format!("box.name={name}"))
             .arg("--annotation")
             .arg(format!("box.hash={hash}"))
+            .arg(name)
             .spawn_ok()
             .context("Fault when instantiating image")?;
         
         Ok(())
-    }
-
-    pub fn exists(id: &str) -> Result<bool> {
-        let output = Command::new("podman")
-            .args([
-                "image",
-                "exists",
-                id
-            ])
-            .output()
-            .context("Failed to check if image exists")?;
-
-        Ok(
-            output.status.success()
-        )
     }
 
     pub fn annotation(&self, key: &str) -> Option<&str> {
@@ -362,4 +356,45 @@ impl Image {
             .get(key)
             .map(String::as_str)
     }
+}
+
+pub fn push_annotation(ctr: &str, key: &str, data: &str) -> Result<()> {
+    let format_str = format!(
+        "{{{{index .ImageAnnotations \"{}\"}}}}",
+        key
+    );
+
+    let old = Command::new("buildah")
+        .arg("inspect")
+        .arg("-t")
+        .arg("container")
+        .arg("--format")
+        .arg(format_str)
+        .arg(ctr)
+        .output_ok()
+        .context("Fault when retrieving annotation from working container")?;
+
+    let old = old
+        .split('\x1F')
+        .chain([data])
+        .collect();
+
+    debug!("Writing {old:?} to {key} for {ctr}");
+
+    write_annotation(ctr, key, old)
+}
+
+pub fn write_annotation(ctr: &str, key: &str, data: Vec<&str>) -> Result<()> {
+    let mapping = format!(
+        "{key}={}",
+        data.join("\x1F").trim_start_matches('\x1F')
+    );
+
+    Command::new("buildah")
+        .arg("config")
+        .arg("-a")
+        .arg(mapping)
+        .arg(ctr)
+        .spawn_ok()
+        .context("Fault when writing annotation to working container")
 }

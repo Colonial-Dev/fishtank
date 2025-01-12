@@ -24,16 +24,15 @@ pub enum Command {
     /// List all managed containers (alias: ls)
     #[clap(alias = "ls")]
     Containers,
-    /// List all managed images (alias: lsi)
-    #[clap(alias = "lsi")]
-    Images,
+    /// List all managed definitions
+    Definitions,
 
     /// Create a new container definition.
     Create { name: String },
     /// Edit an existing container definition.
     Edit   { name: String },
     /// Delete a container definition.
-    Delete { name: String },
+    Delete { name: String, #[arg(short, long)] yes: bool },
     /// Invoke $SHELL inside a container.
     Enter  { name: String },
     /// Execute a command inside a container.
@@ -45,16 +44,7 @@ pub enum Command {
         /// Arguments to the program, if any.
         args: Vec<String>,
     },
-    /// Create a new container from the provided image and execute a command inside it;
-    /// the container will be deleted after the command terminates.
-    Ephemeral {
-        /// The name of the image.
-        name: String,
-        /// The program to execute.
-        path: String,
-        /// Arguments to the program, if any.
-        args: Vec<String>,
-    },
+
     /// Compile definitions into container images.
     Build {
         /// The definitions to build.
@@ -96,8 +86,7 @@ pub enum Command {
     #[clap(hide = true)]
     Config {
         operation : String,
+        #[arg(allow_hyphen_values = true)]
         args      : Vec<String>,
-        #[arg(last = true)]
-        rest      : Vec<String>, 
     }
 }

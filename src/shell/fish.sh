@@ -1,9 +1,11 @@
 function trap -a command
-    function $command
+    function $command -V command
         command $command $argv
         
-        if [ $status -ne 0 ]
-            exit $status
+        set -l s $status
+
+        if [ $s -ne 0 ]
+            exit $s
         else
             return 0
         end
@@ -89,6 +91,10 @@ end
 
 function WORKDIR
     buildah config --workingdir $argv $__BOX_BUILD_CTR
+end
+
+function CFG
+    bx config $argv
 end
 
 function PRESET

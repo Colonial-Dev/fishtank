@@ -189,10 +189,18 @@ impl Definition {
 
     pub fn build(&self) -> Result<()> {
         use std::fs;
+        use colored::Colorize;
 
         info!(
             "Building definition at path {:?}...",
             &self.path
+        );
+
+        println!(
+            "{} {}{}",
+            "Building definition".bold().bright_white(),
+            self.name().bold().green(),
+            "...".bold().bright_white()
         );
 
         if self.meta.containerfile {
@@ -362,14 +370,111 @@ impl Definition {
 
 impl Definition {
     pub fn create(name: String) -> Result<()> {
+        use std::fs::File;
+        use dialoguer::Editor;
+
+        if Self::exists(&name)? {
+            let err = eyre!("Definition {name} already exists")
+                .suggestion("You may want to edit or delete it instead.");
+
+            return Err(err);
+        }
+
+        let path = definition_directory()?
+            .join(
+                format!("{name}.box")
+            );
+
+        File::create(&path)
+            .context("Fault when creating definition file")?;
+
+        if let Some(data) = Editor::new()
+            .require_save(true)
+            .edit("#!/bin/bash\n\n")
+            .context("Fault when editing new definition")?
+        {
+            std::fs::write(&path, data)
+                .context("Fault when writing new definition to file")?
+        }
+        else {
+            warn!("Definition creation aborted!");
+
+            std::fs::remove_file(&path)
+                .context("Fault when removing unwanted definition file")?;
+
+            bail!("Definition creation aborted")
+        }
+        
         Ok(())
     }
 
     pub fn edit(name: String) -> Result<()> {
+        use dialoguer::Editor;
+
+        if !Self::exists(&name)? {
+            let err = eyre!("Definition {name} does not exist")
+                .note("Box checked the path {path:?}")
+                .suggestion("Maybe create it first?");
+
+            return Err(err);
+        }
+
+        let path = definition_directory()?
+            .join(
+                format!("{name}.box")
+            );
+
+        let data = std::fs::read_to_string(&path)
+            .context("Fault when reading in definition data for editing")?;
+
+        if let Some(data) = Editor::new()
+            .require_save(true)
+            .edit(&data)
+            .context("Fault when editing definition")?
+        {
+            std::fs::write(&path, data)
+                .context("Fault when writing definition to file")?
+        }
+        else {
+            warn!("Definition edit aborted!");
+            bail!("Definition edit aborted")
+        }
+
         Ok(())
     }
 
-    pub fn delete(name: String) -> Result<()> {
+    pub fn delete(name: String, yes: bool) -> Result<()> {
+        use dialoguer::Confirm;
+
+        if !Self::exists(&name)? {
+            let err = eyre!("Definition {name} does not exist")
+                .note("Box checked the path {path:?}")
+                .suggestion("Maybe create it first?");
+
+            return Err(err);
+        }
+
+        let path = definition_directory()?
+            .join(
+                format!("{name}.box")
+            );
+
+        if !yes {
+            let confirm = Confirm::new()
+                .with_prompt(
+                    format!("Are you sure you want to remove the definition {name:?}")
+                )
+                .interact()
+                .context("Fault when asking for user confirmation")?;
+
+            if !confirm {
+                return Ok(())
+            }
+        }
+
+        std::fs::remove_file(path)
+            .context("Fault when removing definition")?;
+
         Ok(())
     }
 }
@@ -519,7 +624,7 @@ pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
         for dep in graph[idx].depends_on().to_vec() {
             // We (counter-intuitively, at least to me)
             // insert edges in reverse; otherwise, the final
-            // topological sort is invalid.
+            // topological sort is inverted.
             graph.update_edge(
                 indices[&dep],
                 idx,
@@ -530,13 +635,27 @@ pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
 
     debug!("Walking set graph to compute tree hashes for each definition...");
 
+    // We reverse the graph temporarily
+    // in order to make the DFS work.
+    graph.reverse();
+
     for idx in graph.node_indices() {
+        debug!("Walking from {:?}", graph[idx]);
+
         let mut search = Dfs::new(&graph, idx);
 
         while let Some(nx) = search.next(&graph) {
-            graph[idx].tree ^= graph[nx].hash;
+            debug!("{:?} -> {:?}", graph[idx], graph[nx]);
+
+            if graph[idx].tree != graph[nx].hash {
+                // While probably not cryptographically sound,
+                // XORing hashes together like this is commutative.
+                graph[idx].tree ^= graph[nx].hash;
+            }
         }
     }
+
+    graph.reverse();
 
     debug!("Topologically sorting build set...");
 
@@ -544,7 +663,7 @@ pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
         .map_err(|e| eyre!{"{e:?}"})
         .context("Cycle detected in definition dependency graph")?;
         
-    if !force {
+    if force {
         for idx in topo {
             graph[idx].build()?;
         }
@@ -577,14 +696,20 @@ pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
         )
         .collect();
 
+    debug!("Path -> Hash mapping computed:\n{path_hash:?}");
+
     for idx in topo {
         let def = &graph[idx];
+
+        debug!("Inspecting... {def:?}");
 
         // If no image with a corresponding path exists, build.
         let Some(hashes) = path_hash.get(&def.path) else {
             def.build()?;
             continue
         };
+
+        debug!("Hashes: {hashes:?}");
 
         let (own, tree) = hashes;
         

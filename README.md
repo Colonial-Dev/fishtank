@@ -1,5 +1,5 @@
 <h1 align="center">Box</h1>
-<h3 align="center">An interactive container manager for your shell.</h3>
+<h3 align="center">A script-based interactive container manager.</h3>
 
 <p align="center">
 <img src="https://img.shields.io/github/actions/workflow/status/Colonial-Dev/box/rust.yml">
@@ -34,6 +34,21 @@ Lightweight[^1], easy to install, and works on any Linux machine with `podman` a
 
 ## Installation
 Before installing, make sure you have `podman` and a supported shell (either `fish` or anything POSIX-compliant) installed on your system.
+
+### From Source (Recommended)
+Build-time dependencies:
+- The most recent stable [Rust toolchain](https://rustup.rs/).
+- A C/C++ toolchain (such as `gcc`.)
+
+The rest is easy - just use `cargo install`, and Box will be automatically compiled and added to your `PATH`.
+```sh
+cargo install --locked --git https://github.com/Colonial-Dev/box --branch master
+```
+
+The same command can be used to update Box in the future.
+
+### MUSL Binary
+Alternatively, statically-linked MUSL binaries are available in the [releases](https://github.com/Colonial-Dev/box) section. 
 
 ## Getting Started
 
@@ -189,7 +204,11 @@ I used to heavily rely on Toolbx for my development environments, and I also dab
 
 Box, by contrast, is entirely opt-in when it comes to host integrations. You get to choose precisely what (if anything) is shared.
 
+> This is good for "soft" security against stuff like supply chain attacks; if (some day) I execute a `build.rs` that tries to hijack my session tokens or wipe my system - no big deal.
+
 Box also requires that every container be associated with a "definition," rather than defaulting to a standard "toolbox" image for each container. These can either be standard Containerfiles, or they can use Box's custom shell-based format to declare runtime arguments (like mounts) during build time.
+
+> I find this particularly advantageous for ensuring a consistent environment between my desktop and my laptop. It also makes for a good "lazy man's NixOS" on my Pi-hole server.
 
 So:
 - If you don't mind the above caveats and want containerized environments that Just Work with the host, use Toolbx or Distrobox.
@@ -210,6 +229,6 @@ The main requirements were:
 - Space efficient.
 - No runtime dependencies apart from the `podman` suite.
 
-A fast, small, and self-contained binary is one that I can commit to my `dotfiles` repository and forget about.
+A fast, small, and self-contained binary is one that I can commit to my `dotfiles` repository and forget about. The same cannot be said of an equivalently feature rich Python utility.
 
 [^1]: Single Rust binary compiled from ~2000 lines of boring plumbing code. Red Hat and the OCI have already done all the heavy lifting here!
