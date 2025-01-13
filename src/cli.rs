@@ -42,6 +42,17 @@ pub enum Command {
         /// The program to execute.
         path: String,
         /// Arguments to the program, if any.
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Execute a command inside a new ephemeral container.
+    Ephemeral {
+        /// The name or ID of the image to use.
+        name: String,
+        /// The program to execute.
+        path: String,
+        /// Arguments to the program, if any.
+        #[arg(allow_hyphen_values = true)]
         args: Vec<String>,
     },
 

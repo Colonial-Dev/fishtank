@@ -1,4 +1,2 @@
-- `Ephemeral` command (use `--entrypoint`)
-- Fix passing flags to exec
 - Update README
 - Write DEFINITIONS

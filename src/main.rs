@@ -159,6 +159,20 @@ fn main() -> Result<()> {
 
             ctr.exec(&path, &args)?;
         },
+        Ephemeral { name, path, args } => {
+            let image = Image::from_id(&name)?;
+
+            let args = match args.len() {
+                0 => format!("--entrypoint={path}"),
+                _ => format!("--entrypoint={path} {}", args.join(" "))
+            };
+
+            image.instantiate_ext(
+                false,
+                true,
+                &[args]
+            )?;
+        },
 
         Build { defs, all, force } => build_set(&defs, all, force)?,
 
