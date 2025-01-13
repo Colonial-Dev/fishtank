@@ -107,7 +107,7 @@ impl Definition {
         }
         else {
             let suggestion = match Self::alternative(name) {
-                Some(m) => format!("Did you mean: {}", m),
+                Some(m) => format!("Did you mean '{}'?", m),
                 None => "Did you make a typo?".to_string(),
             };
 
@@ -196,7 +196,7 @@ impl Definition {
             &self.path
         );
 
-        println!(
+        eprintln!(
             "{} {}{}",
             "Building definition".bold().bright_white(),
             self.name().bold().green(),

@@ -220,6 +220,35 @@ impl Container {
 
         Ok(())
     }
+
+    pub fn enter(&self) -> Result<()> {
+            Command::new("podman")
+                .arg("exec")
+                .arg("-it")
+                .arg(&self.id)
+                .arg("sh")
+                .arg("-c")
+                .arg("exec $SHELL")
+                .spawn()
+                .context("Fault when spawning shell inside container")?
+                .wait()?;
+        
+        Ok(())
+    }
+
+    pub fn exec(&self, path: &str, args: &[String]) -> Result<()> {
+        Command::new("podman")
+            .arg("exec")
+            .arg("-it")
+            .arg(&self.id)
+            .arg(path)
+            .args(args)
+            .spawn()
+            .context("Fault when spawning process inside container")?
+            .wait()?;
+        
+        Ok(())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -344,7 +373,7 @@ impl Image {
             .arg("--annotation")
             .arg(format!("box.hash={hash}"))
             .arg(name)
-            .spawn_ok()
+            .output_ok()
             .context("Fault when instantiating image")?;
         
         Ok(())

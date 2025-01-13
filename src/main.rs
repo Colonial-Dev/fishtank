@@ -30,8 +30,14 @@ use build::*;
 use cli::*;
 use podman::*;
 
+#[cfg(not(target_os = "linux"))]
+compile_error!(
+    "Box targets Linux only - compilation halted."
+);
+
 fn main() -> Result<()> {
     use clap::Parser;
+    use indicatif::{ProgressBar, ProgressStyle};
     use Command::*;
 
     let args = Cli::parse();
@@ -53,10 +59,27 @@ fn main() -> Result<()> {
     ensure("podman")?;
     ensure("buildah")?;
 
-    let map_set = |set: &ContainerSet, func: fn(&Container) -> Result<()>| -> Result<_> {
+    let map_set = |set: &ContainerSet, func: fn(&Container) -> Result<()>, op: &str| -> Result<_> {
+        let style = format!(
+            "{{spinner}} {op} {{msg:.green}}..."
+        );
+
+        let style = ProgressStyle::with_template(&style)
+            .unwrap();
+
+        let bar = ProgressBar::new_spinner()
+            .with_style(style);
+
+        bar.enable_steady_tick(
+            std::time::Duration::from_millis(100)
+        );
+    
         match set.all {
             false => {
                 for id in &set.containers {
+                    bar.set_message(
+                        id.to_owned()
+                    );
                     existence_check(id)?;
 
                     func(
@@ -66,10 +89,42 @@ fn main() -> Result<()> {
             },
             true => {
                 for ctr in Container::enumerate()? {
+                    bar.set_message(
+                        ctr
+                            .annotation("box.name")
+                            .unwrap_or("?")
+                            .to_owned()
+                    );
+
                     func(&ctr)?;
                 }
             },
         };
+
+        Ok(())
+    };
+
+    let instantiate = |set: &[Image], replace| -> Result<_> {
+        let style = ProgressStyle::with_template("{spinner} Creating {msg:.green}...")
+            .unwrap();
+
+        let bar = ProgressBar::new_spinner()
+            .with_style(style);
+
+        bar.enable_steady_tick(
+            std::time::Duration::from_millis(100)
+        );
+        
+        for image in set {
+            bar.set_message(
+                image
+                    .annotation("box.name")
+                    .unwrap_or("?")
+                    .to_owned()
+            );
+
+            image.instantiate(replace)?;
+        }
 
         Ok(())
     };
@@ -83,8 +138,6 @@ fn main() -> Result<()> {
         Delete { name, yes } => Definition::delete(name, yes)?,
 
         Enter { name } => {
-            use std::process::Command;
-
             existence_check(&name)?;
 
             let ctr = Container::from_id(&name)?;
@@ -93,19 +146,9 @@ fn main() -> Result<()> {
                 ctr.start()?;
             }
 
-            Command::new("podman")
-                .arg("exec")
-                .arg("-it")
-                .arg(name)
-                .arg("sh")
-                .arg("-c")
-                .arg("exec $SHELL")
-                .spawn()
-                .context("Fault when spawning shell inside container")?
-                .wait()?;        },
+            ctr.enter()?;
+        },
         Exec { name, path, args } => {
-            use std::process::Command;
-
             existence_check(&name)?;
 
             let ctr = Container::from_id(&name)?;
@@ -114,26 +157,18 @@ fn main() -> Result<()> {
                 ctr.start()?;
             }
 
-            Command::new("podman")
-                .arg("exec")
-                .arg("-it")
-                .arg(name)
-                .arg(path)
-                .args(args)
-                .spawn()
-                .context("Fault when spawning process inside container")?
-                .wait()?;
+            ctr.exec(&path, &args)?;
         },
 
         Build { defs, all, force } => build_set(&defs, all, force)?,
 
 
-        Start   (set) => map_set(&set, Container::start)?,
-        Stop    (set) => map_set(&set, Container::stop)?,
-        Restart (set) => map_set(&set, Container::restart)?,
-        Down    (set) => map_set(&set, Container::down)?,
+        Start   (set) => map_set(&set, Container::start, "Starting")?,
+        Stop    (set) => map_set(&set, Container::stop, "Stopping")?,
+        Restart (set) => map_set(&set, Container::restart, "Restarting")?,
+        Down    (set) => map_set(&set, Container::down, "Removing")?,
         Reup    (set) => {
-            map_set(&set, Container::down)?;
+            map_set(&set, Container::down, "Removing")?;
 
             let set: Vec<_> = match set.all {
                 false => {
@@ -150,9 +185,7 @@ fn main() -> Result<()> {
                 true => Image::enumerate()?
             };
 
-            for image in set {
-                image.instantiate(true)?;
-            }
+            instantiate(&set, true)?;
         },
         Up { containers, all, replace } => {
             let set: Vec<_> = match all {
@@ -169,108 +202,26 @@ fn main() -> Result<()> {
                 },
                 true => Image::enumerate()?
             };
-
-            for image in set {
-                image.instantiate(replace)?;
-            }
+            
+            instantiate(&set, replace)?;
         }
 
         Init { shell } => match &*shell {
-            "fish"  => init_fish(),
-            "posix" => init_posix(),
+            "fish"  => {
+                print!(
+                    "{}",
+                    include_str!("shell/fish.sh")
+                )
+            },
+            "posix" => {
+                print!(
+                    "{}",
+                    include_str!("shell/posix.sh")
+                )
+            },
             _       => unreachable!()
         },
-        Config { operation, args } => {
-            use std::process::Command;
-
-            let Ok(ctr) = std::env::var("__BOX_BUILD_CTR") else {
-                let err = eyre!("Config command must be invoked inside of a build context")
-                    .suggestion("This is probably happening due to an issue with a FROM directive.")
-                    .suggestion("Alternately, it may be a bug in Box.");
-
-                return Err(err);
-            };
-            
-            // Certain operations, like ADD and RUN, need to be split
-            // based on the presence of an '--' arg so they can be re-arranged
-            // appropriately.
-            let (args, trailing) = match args.iter().position(|i| i == "--") {
-                Some(idx) => {
-                    let (l, r) = args.split_at(idx);
-
-                    let r = match r.len() {
-                        0 | 1 => [].as_slice(),
-                        _ => &r[1..]
-                    };
-
-                    (l, r)
-                }
-                None => (
-                    args.as_slice(),
-                    [].as_slice()
-                )
-            };
-
-            debug!("Post-processed arguments: {args:?} // {trailing:?}");
-
-            match operation.as_str() {
-                // We handle ADD/COPY and RUN in Rust code,
-                // because correctly handling arguments split by --
-                // in shellcode is... non trivial.
-                "run" => {
-                    Command::new("buildah")
-                        .arg("run")
-                        .args(trailing)
-                        .arg(ctr)
-                        .arg("--")
-                        .args(args)
-                        .spawn_ok()?
-                }
-                "add" => {
-                    Command::new("buildah")
-                        .arg("add")
-                        .args(args)
-                        .arg(ctr)
-                        .args(trailing)
-                        .spawn_ok()?
-                }
-                "preset" => {
-                    evaluate_preset(&ctr, args)?
-                },
-                o if ANNOTATIONS.contains(&o) => {
-                    let Some(val) = args.first() else {
-                        bail!("Configuration value not specified")
-                    };
-
-                    push_annotation(
-                        &ctr,
-                        &format!("box.{o}"),
-                        val
-                    )?;
-                },
-                o if CONFIG_FLAGS.contains(&o) => {
-                    if args.is_empty() {
-                        bail!("Configuration value not specified")
-                    };
-
-                    Command::new("buildah")
-                        .arg("config")
-                        .arg(
-                            format!("--{o}")
-                        )
-                        .args(args)
-                        .arg(ctr)
-                        .spawn_ok()
-                        .context("Fault when seting build-time configuration flag")?;
-                },
-                _ => {
-                    let err = eyre!("Unknown configuration option {operation}")
-                        .suggestion("Did you make a typo?");
-
-                    return Err(err);
-                }
-            }
-        },
+        Config { operation, args } => evaluate_config(operation, args)?,
     }
 
     Ok(())
@@ -281,7 +232,7 @@ fn install_logging() {
 
     color_eyre::config::HookBuilder::new()
         .panic_section("Well, this is embarassing. It appears Box has crashed!\nConsider reporting the bug at <https://github.com/Colonial-Dev/box>.")
-        .capture_span_trace_by_default(true)
+        .display_env_section(false)
         .display_location_section(false)
         .install()
         .expect("Could not install Eyre hooks!");
@@ -313,7 +264,7 @@ fn existence_check(id: &str) -> Result<()> {
         ).match_list(names, &mut matcher);
 
         let suggestion = match matches.first() {
-            Some(m) => format!("Did you mean: {}", m.0),
+            Some(m) => format!("Did you mean '{}'?", m.0),
             None => "Did you make a typo?".to_string(),
         };
 
@@ -360,8 +311,7 @@ fn ensure(program: &str) -> Result<()> {
 
 fn list_containers() -> Result<()> {
     use comfy_table::Table;
-    use comfy_table::presets::UTF8_FULL;
-    use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+    use comfy_table::presets::NOTHING;
 
     let mut table = Table::new();
     let ctrs      = Container::enumerate()?;
@@ -375,11 +325,9 @@ fn list_containers() -> Result<()> {
         ]);
 
     table
-        .load_preset(UTF8_FULL)
-        .apply_modifier(UTF8_ROUND_CORNERS)
+        .load_preset(NOTHING)
         .set_header(["Name", "Image", "Status"])
         .add_rows(rows);
-
 
     println!("{table}");
 
@@ -388,8 +336,7 @@ fn list_containers() -> Result<()> {
 
 fn list_definitions() -> Result<()> {
     use comfy_table::Table;
-    use comfy_table::presets::UTF8_FULL;
-    use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+    use comfy_table::presets::NOTHING;
 
     let mut table = Table::new();
     let defs      = Definition::enumerate()?;
@@ -408,31 +355,110 @@ fn list_definitions() -> Result<()> {
                 "POSIX script"
             }
         ]);
-
+        // TODO + is created?
+    
     table
-        .load_preset(UTF8_FULL)
-        .apply_modifier(UTF8_ROUND_CORNERS)
+        .load_preset(NOTHING)
         .set_header(["Name", "Type"])
         .add_rows(rows);
-
 
     println!("{table}");
 
     Ok(())
 }
 
-fn init_posix() {
-    print!(
-        "{}",
-        include_str!("shell/posix.sh")
-    )
-}
+fn evaluate_config(operation: String, args: Vec<String>) -> Result<()> {
+    use std::process::Command;
 
-fn init_fish() {
-    print!(
-        "{}",
-        include_str!("shell/fish.sh")
-    )
+    let Ok(ctr) = std::env::var("__BOX_BUILD_CTR") else {
+        let err = eyre!("Config command must be invoked inside of a build context")
+            .suggestion("This is probably happening due to an issue with a FROM directive.")
+            .suggestion("Alternately, it may be a bug in Box.");
+
+        return Err(err);
+    };
+    
+    // Certain operations, like ADD and RUN, need to be split
+    // based on the presence of an '--' arg so they can be re-arranged
+    // appropriately.
+    let (args, trailing) = match args.iter().position(|i| i == "--") {
+        Some(idx) => {
+            let (l, r) = args.split_at(idx);
+
+            let r = match r.len() {
+                0 | 1 => [].as_slice(),
+                _ => &r[1..]
+            };
+
+            (l, r)
+        }
+        None => (
+            args.as_slice(),
+            [].as_slice()
+        )
+    };
+
+    debug!("Post-processed arguments: {args:?} // {trailing:?}");
+
+    match operation.as_str() {
+        // We handle ADD/COPY and RUN in Rust code,
+        // because correctly handling arguments split by --
+        // in shellcode is... non trivial.
+        "run" => {
+            Command::new("buildah")
+                .arg("run")
+                .args(trailing)
+                .arg(ctr)
+                .arg("--")
+                .args(args)
+                .spawn_ok()?
+        }
+        "add" => {
+            Command::new("buildah")
+                .arg("add")
+                .args(args)
+                .arg(ctr)
+                .args(trailing)
+                .spawn_ok()?
+        }
+        "preset" => {
+            evaluate_preset(&ctr, args)?
+        },
+        o if ANNOTATIONS.contains(&o) => {
+            let Some(val) = args.first() else {
+                bail!("Configuration value not specified")
+            };
+
+            push_annotation(
+                &ctr,
+                &format!("box.{o}"),
+                val
+            )?;
+        },
+        o if CONFIG_FLAGS.contains(&o) => {
+            if args.is_empty() {
+                bail!("Configuration value not specified")
+            };
+
+            Command::new("buildah")
+                .arg("config")
+                .arg(
+                    format!("--{o}")
+                )
+                .args(args)
+                .arg(ctr)
+                .spawn_ok()
+                .context("Fault when seting build-time configuration flag")?;
+        },
+        _ => {
+            let err = eyre!("Unknown configuration option {operation}")
+                .suggestion("Did you make a typo?");
+
+            return Err(err);
+        }
+    }
+
+    Ok(())
 }
 
 fn evaluate_preset(ctr: &str, args: &[String]) -> Result<()> {

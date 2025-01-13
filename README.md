@@ -28,10 +28,6 @@ Bring your existing Docker-style container definitions...
 
 Lightweight[^1], easy to install, and works on any Linux machine with `podman` and a compatible shell (POSIX-compliant or `fish`.)
 
-<p align="center">
-    <img src=".github/demo_install.gif">
-</p>
-
 ## Installation
 Before installing, make sure you have `podman` and a supported shell (either `fish` or anything POSIX-compliant) installed on your system.
 
@@ -82,7 +78,7 @@ RUN dnf install gcc
 COMMIT $ctr toolbox
 ```
 
-The harness for shell-based definitions injects several tools for setting up your container.
+The harness for shell-based definitions provides several tools for setting up your container.
 - All Containerfile directives like `RUN` and `ADD` are polyfilled as shell functions, and generally act the same as their real counterparts. 
   - (The most notable exception is pipes and redirections in `RUN` - you must wrap them in an `sh -c` to execute them wholly inside the working container.)
 - The `CFG` and `PRESET` directives, which let you:
@@ -105,17 +101,9 @@ for my development containers.
 
 # Fedora Toolbox is my preferred base, but there are similar images
 # available for distributions like Debian and Arch.
-#
-# The 'buildah' command here is actually a transparent wrapper injected by Box;
-# when you invoke the 'from' subcommand, it does some book-keeping to integrate
-# the working container.
 set ctr (FROM fedora-toolbox:latest)
 
 # Copy my user into the container.
-#
-# You may notice that these commands don't take a 'container' argument;
-# that's because the aforementioned 'buildah' wrapper exports that information
-# into a fixed shell variable for these commands to use internally.
 PRESET preset cp-user $USER
 # Fix Unix and SELinux permission issues with rootless mounting of host files.
 PRESET preset bind-fix
@@ -146,9 +134,9 @@ COMMIT $ctr localhost/base
 ```sh
 #!/usr/bin/env fish
 #~ depends_on = ["base"]
-
 # Box is capable of computing (and following) 
 # a dependency graph for your definitions via the `depends_on` metadata key.
+
 set ctr (FROM localhost/base)
 
 ENV "CARGO_INSTALL_ROOT=/home/$USER/.cargo/install"
@@ -192,6 +180,8 @@ CFG args "--user=1000:1000"
 COMMIT $ctr jellyfin
 ```
 
+In testing, I've had success with everything from a Minecraft server to [Ollama](https://ollama.com) by simply adapting existing Docker instructions.
+
 ## FAQ
 
 ### "How does this compare to Toolbx or Distrobox?"
@@ -217,9 +207,15 @@ So:
 ### "Why not just use Kubernetes YAML or `compose`?"
 A few reasons:
 
-1. Separating the information on how to *build* the image from information on how to *run* it is lame, especially for Box's target use case of "bespoke interactive containers."
-2. Kubernetes YAML is massively overcomplicated, and the `podman` version of `compose` was somewhat buggy when I tried it.
-3. YAML sucks.
+1.  For Box's target use case of "bespoke interactive containers," separating the information on how to *build* the image from information on how to *run* it is lame.
+    - I am also an avowed [locality of behavior](https://htmx.org/essays/locality-of-behaviour/) enjoyer.
+2. Kubernetes YAML is massively overcomplicated for what I wanted to do, and the `podman` version of `compose` was somewhat buggy when I tried it.
+3. YAML is... YAML.
+
+### "Creating containers (`up`) is extremely slow."
+
+This seems to be a `podman` issue with the default `overlay` storage driver on BTRFS (and possibly ZFS) systems that causes expensive copies during container creation.
+I followed [this](https://www.jwillikers.com/podman-with-btrfs-and-zfs) guide to switch my storage driver to use BTRFS subvolumes and experienced massive speedups.
 
 ### "Why Rust?"
 It's my favorite out of the "good for command-line" language pantheon.
