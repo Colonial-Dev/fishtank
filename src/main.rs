@@ -369,7 +369,6 @@ fn list_definitions() -> Result<()> {
                 "POSIX script"
             }
         ]);
-        // TODO + is created?
     
     table
         .load_preset(NOTHING)
@@ -589,6 +588,16 @@ fn evaluate_preset(ctr: &str, args: &[String]) -> Result<()> {
                 "box.mount",
                 &format!("type=bind,src={sock},dst={sock}")
             )?;
+
+            Command::new("buildah")
+                .arg("config")
+                .arg("--env")
+                .arg(
+                    format!("SSH_AUTH_SOCK={sock}")
+                )
+                .arg(ctr)
+                .spawn_ok()
+                .context("Fault when saving SSH_AUTH_SOCK value to container")?;
         },
         "devices" => {
             warn!("Using 'devices' preset - this will create a privileged container!");
