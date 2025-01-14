@@ -92,6 +92,18 @@ function WORKDIR
     buildah config --workingdir $argv $__BOX_BUILD_CTR
 end
 
+function SHELL
+    buildah config --shell $argv $__BOX_BUILD_CTR
+end
+
+function HEALTHCHECK
+    buildah config --healthcheck $argv $__BOX_BUILD_CTR
+end
+
+function STOPSIGNAL
+    buildah config --stop-signal $argv $__BOX_BUILD_CTR
+end
+
 function CFG
     bx config $argv
 end

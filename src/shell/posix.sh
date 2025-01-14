@@ -70,6 +70,19 @@ WORKDIR() {
     buildah config --workingdir "$@" $__BOX_BUILD_CTR
 }
 
+SHELL() {
+    buildah config --shell "$@" $__BOX_BUILD_CTR
+}
+
+HEALTHCHECK() {
+    buildah config --healthcheck "$@" $__BOX_BUILD_CTR
+}
+
+STOPSIGNAL() {
+    buildah config --stop-signal "$@" $__BOX_BUILD_CTR
+}
+
+
 CFG() {
     bx config "$@"
 }
