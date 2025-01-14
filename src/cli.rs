@@ -21,41 +21,6 @@ pub struct ContainerSet {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// List all managed containers (alias: ls)
-    #[clap(alias = "ls")]
-    Containers,
-    /// List all managed definitions
-    Definitions,
-
-    /// Create a new container definition.
-    Create { name: String },
-    /// Edit an existing container definition.
-    Edit   { name: String },
-    /// Delete a container definition.
-    Delete { name: String, #[arg(short, long)] yes: bool },
-    /// Invoke $SHELL inside a container.
-    Enter  { name: String },
-    /// Execute a command inside a container.
-    Exec {
-        /// The name of the container.
-        name: String,
-        /// The program to execute.
-        path: String,
-        /// Arguments to the program, if any.
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-    /// Execute a command inside a new ephemeral container.
-    Ephemeral {
-        /// The name or ID of the image to use.
-        name: String,
-        /// The program to execute.
-        path: String,
-        /// Arguments to the program, if any.
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
     /// Compile definitions into container images.
     Build {
         /// The definitions to build.
@@ -67,13 +32,50 @@ pub enum Command {
         #[arg(short, long)]
         force: bool,
     },
-
+    /// List all managed containers (alias: ls)
+    #[clap(alias = "ls")]
+    Containers,
+    /// Create a new container definition.
+    Create { name: String },
+    /// List all managed definitions (alias: lsd)
+    #[clap(alias = "lsd")]
+    Definitions,
+    /// Delete a container definition.
+    Delete { name: String, #[arg(short, long)] yes: bool },
+    /// Remove managed container(s).
+    Down    (ContainerSet),
+    /// Edit an existing container definition.
+    Edit   { name: String },
+    /// Invoke $SHELL inside a container.
+    Enter  { name: String },
+    /// Execute a command inside a new ephemeral container.
+    Ephemeral {
+        /// The name or ID of the image to use.
+        name: String,
+        /// The program to execute.
+        path: String,
+        /// Arguments to the program, if any.
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Execute a command inside a container.
+    Exec {
+        /// The name of the container.
+        name: String,
+        /// The program to execute.
+        path: String,
+        /// Arguments to the program, if any.
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Restart managed container(s).
+    Restart (ContainerSet),
+    /// Remove and re-create managed container(s).
+    Reup    (ContainerSet),
     /// Start managed container(s).
     Start   (ContainerSet),
     /// Stop managed containers(s).
     Stop    (ContainerSet),
-    /// Restart managed container(s).
-    Restart (ContainerSet),
     /// Create managed container(s).
     Up {
         /// One or more images; can use names and IDs interchangeably.
@@ -85,10 +87,6 @@ pub enum Command {
         #[arg(short, long)]
         replace: bool,
     },
-    /// Remove managed container(s).
-    Down    (ContainerSet),
-    /// Remove and re-create managed container(s).
-    Reup    (ContainerSet),
 
     #[clap(hide = true)]
     Init {
