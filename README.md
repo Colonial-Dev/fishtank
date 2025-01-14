@@ -104,11 +104,11 @@ for my development containers.
 FROM fedora-toolbox:latest
 
 # Copy my user into the container.
-PRESET preset cp-user $USER
+PRESET cp-user
 # Fix Unix and SELinux permission issues with rootless mounting of host files.
-PRESET preset bind-fix
+PRESET bind-fix
 # Mount the SSH agent socket into the container. (Implies bind-fix)
-PRESET preset ssh-agent
+PRESET ssh-agent
 
 # Copy my GNU Stow .dotfiles directory into the container.
 ADD --chown $USER:$USER -- $HOME/.dotfiles /home/$USER/.dotfiles
@@ -152,8 +152,8 @@ RUN mkdir -p /home/$USER/.local/bin
 #
 # Combined with setting CARGO_INSTALL_ROOT, this means I can 'cargo install' binaries
 # inside the container and use them outside it.
-tankcfg mount type=bind,src=$HOME/Documents/Projects,dst=/home/$USER/Projects
-tankcfg mount type=bind,src=$HOME/.local/bin/cargo,dst=/home/$USER/.cargo/install/bin
+CFG mount type=bind,src=$HOME/Documents/Projects,dst=/home/$USER/Projects
+CFG mount type=bind,src=$HOME/.local/bin/cargo,dst=/home/$USER/.cargo/install/bin
 
 # Commit the container, basing the name on the symlink used to invoke this definition.
 COMMIT localhost/rust
