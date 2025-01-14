@@ -1,10 +1,10 @@
-<h1 align="center">Fishtank</h1>
-<h3 align="center">An interactive container manager for the <code>fish</code> shell.</h3>
+<h1 align="center">Box</h1>
+<h3 align="center">A script-based interactive container manager.</h3>
 
 <p align="center">
-<img src="https://img.shields.io/github/actions/workflow/status/Colonial-Dev/fishtank/fish.yml">
-<img src="https://img.shields.io/github/license/Colonial-Dev/fishtank">
-<img src="https://img.shields.io/github/stars/Colonial-Dev/fishtank">
+<img src="https://img.shields.io/github/actions/workflow/status/Colonial-Dev/box/rust.yml">
+<img src="https://img.shields.io/github/license/Colonial-Dev/box">
+<img src="https://img.shields.io/github/stars/Colonial-Dev/box">
 </p>
 
 ## Features
@@ -20,124 +20,95 @@ Bring your existing Docker-style container definitions...
     <img src=".github/README_B.png">
 </p>
 
-... or take advantage of Fishtank's custom shell-based format that bundles together all the information needed to build *and* run your containers.
+... or take advantage of Box's custom shell-based format that bundles together all the information needed to build *and* run your containers.
 
 <p align="center">
     <img src=".github/README_A.png">
 </p>
 
-Lightweight[^1], easy to install, and works on any[^2] Linux machine with `podman` and `fish`.
-
-<p align="center">
-    <img src=".github/demo_install.gif">
-</p>
+Lightweight[^1], easy to install, and works on any Linux machine with `podman`.
 
 ## Installation
-Before installing, make sure you have the following packages on your system:
-- `fish`
-- `podman`
-- `coreutils`
+Before continuing, make sure you have `podman` (and `buildah`, if not included with `podman`) installed.
 
+### From Source (Recommended)
+Build-time dependencies:
+- The most recent stable [Rust toolchain](https://rustup.rs/).
+- A C/C++ toolchain (such as `gcc`.)
+
+The rest is easy - just use `cargo install`, and Box will be automatically compiled and added to your `PATH`.
 ```sh
-curl -Lf https://github.com/Colonial-Dev/fishtank/releases/latest/download/tankctl | source - install
+cargo install --locked --git https://github.com/Colonial-Dev/box --branch master
 ```
 
-This downloads the latest stable version of Fishtank and uses the self-update functionality to bootstrap a persistent install.
+The same command can be used to update Box in the future.
 
-By default, this installs two scripts (`tankctl` and `tankcfg`) in the XDG-specified `$HOME/.local/bin` directory - to override the install location, simply pass your preferred path as the third argument:
-
-```sh
-curl -Lf https://github.com/Colonial-Dev/fishtank/releases/latest/download/tankctl | source - install /usr/bin
-```
-
-### From Source
-If you are allergic to `curl | exec`, "building" Fishtank from source using the bundled `do` script is also possible.
-
-```sh
-git clone https://github.com/Colonial-Dev/fishtank && cd fishtank
-./do install
-```
+### MUSL Binary
+Alternatively, statically-linked MUSL binaries are available in the [releases](https://github.com/Colonial-Dev/box) section. 
 
 ## Getting Started
 
-Fishtank requires a definition ("tank") for each container you'd like to create. Definitions can be in two different formats:
-- Standard Container/Dockerfiles - just add `# fishtank containerfile` to the text and you're good to go.
-- `fish` shell scripts that run in a special harness. This injects additional functions and wraps a few others to provide additional functionality not present in Containerfiles, like the ability to declare runtime arguments such as mounts.
+Box requires a definition for each container you'd like to create. Definitions can be in two different formats:
+- Standard Container/Dockerfiles - just add `#~ containerfile = true` to the text and you're good to go.
+- Shell scripts (POSIX or `fish`) that run in a special harness. This injects additional functions and wraps a few others to provide additional functionality not present in Containerfiles, like the ability to declare runtime arguments such as mounts.
 
-Either type must be stored under `$XDG_CONFIG_HOME/fishtank/` (typically `~/.config/fishtank/`) with the file extension `.tank`.
+Either type must be stored with the file extension `.box` under one of:
 
-To create and edit a new definition, you can simply run `tankctl create <NAME>`. This will create the file and open it using your `$EDITOR`.
+- `$BOX_DEFINITION_DIR`
+- `$XDG_CONFIG_HOME/box`
+- `$HOME/.config/box`
 
-`tankctl edit <NAME>` can be used to alter existing definitions; both commands will use a temporary file for editing and perform syntax checks before finalizing any changes.
+Box checks in that order, using the first valid directory it finds.
 
-Shell-based definitions run in the same directory as the definition, and should look something like this:
+To create and edit a new definition, you can simply run `bx create <NAME>`. This will create the file and open it using your `$EDITOR`.
+
+`bx edit <NAME>` can be used to alter existing definitions; both commands will use a temporary file for editing.
+
+Shell-based definitions run in the same directory as the definition, and should look something like the below. I use Fish, but the general structure
+readily translates to POSIX-compatible syntaxes.
 
 ```sh
 # Create a new working container.
-set ctr (buildah from fedora-toolbox:latest)
+FROM fedora-toolbox:latest
 
 # Set up the new container...
 RUN dnf install gcc
 
 # Commit the configured container as an image.
-buildah commit $ctr toolbox
+COMMIT toolbox
 ```
 
-The harness for shell-based definitions enables two primary toolkits for setting up your container.
-- All Containerfile directives like `RUN` and `ADD` are polyfilled as Fish functions, and generally act the same as their real counterparts. 
+The harness for shell-based definitions provides several tools for setting up your container.
+- All Containerfile directives like `RUN` and `ADD` are polyfilled as shell functions, and generally act the same as their real counterparts. 
   - (The most notable exception is pipes and redirections in `RUN` - you must wrap them in an `sh -c` to execute them wholly inside the working container.)
-- The `tankcfg` script, which lets you:
-  - Set various build-time (some of which are duplicated from the above) and runtime switches
+- The `CFG` and `PRESET` directives, which let you:
+  - Set various build-time and runtime switches
   - Provide arbitrary additional arguments to pass to `podman run`
   - Apply several prepackaged presets (such as copying a user from the host into the container, or applying security options to fix bind mounts with SELinux)
 
-Once you have a definition, run `tankctl build` to compile it into an OCI image, followed by `tankctl up` to create a container from the image.
+Once you have a definition, run `bx build` to compile it into an OCI image, followed by `bx up` to create a container from the image.
 
-Complete details on all commands can be found in the `man` pages bundled with Fishtank. Alternatively, you can view their Markdown versions [here](https://github.com/Colonial-Dev/fishtank/tree/master/doc).
+You can find exhaustive documentation and examples on shell-based definitions [here](https://github.com/Colonial-Dev/box/blob/master/DEFINITIONS.md).
 
 ___
 
-For those who would like a concrete example, this is a (annotated and trimmed down) copy of the definition I use
+For those who would like a concrete example, this is a (annotated and trimmed down) copy of the definitions I use
 for my development containers.
 
 ```sh
 #!/usr/bin/env fish
-# A shebang is not necessary, but it enables correct syntax highlighting in my editor.
-
-# If this is the 'base' definition, bail silently - we don't need to build that.
-#
-# Fishtank tries to be relatively stateless, so it doesn't bother detecting that no image
-# was actually built and comitted.
-if [ (status basename | xargs basename -s .tank) = "base" ]
-    exit
-end
+# A shebang is required for Box to disambiguate between Fish and POSIX.
 
 # Fedora Toolbox is my preferred base, but there are similar images
 # available for distributions like Debian and Arch.
-#
-# The 'buildah' command here is actually a transparent wrapper injected by Fishtank;
-# when you invoke the 'from' subcommand, it does some book-keeping to integrate
-# the working container with Fishtank.
-set ctr (buildah from fedora-toolbox:latest)
+FROM fedora-toolbox:latest
 
 # Copy my user into the container.
-#
-# You may notice that these commands don't take a 'container' argument;
-# that's because the aforementioned 'buildah' wrapper exports that information
-# into a fixed shell variable for these commands to use internally.
-tankcfg preset cp-user $USER
+PRESET preset cp-user $USER
 # Fix Unix and SELinux permission issues with rootless mounting of host files.
-tankcfg preset bind-fix
+PRESET preset bind-fix
 # Mount the SSH agent socket into the container. (Implies bind-fix)
-tankcfg preset ssh-agent
-
-# Set the working user to myself...
-USER    $USER
-# ... and the working directory to my $HOME inside the container.
-WORKDIR /home/$USER
-# A dummy 'infinite command' like this keeps the container alive so processes on the host
-# can spawn 'exec' sessions inside.
-CMD     "sleep inf"
+PRESET preset ssh-agent
 
 # Copy my GNU Stow .dotfiles directory into the container.
 ADD --chown $USER:$USER -- $HOME/.dotfiles /home/$USER/.dotfiles
@@ -148,127 +119,102 @@ RUN sudo dnf install -y fish micro stow
 RUN stow -d /home/$USER/.dotfiles --dotfiles common
 RUN stow -d /home/$USER/.dotfiles --dotfiles container
 
-# This 'EXTENSIONS' variable is used in a small script, unrelated to this project,
-# that automatically installs extensions into the Visual Studio Code development container server.
-set -a EXTENSIONS Gruntfuggly.todo-tree
-set -a EXTENSIONS mhutchie.git-graph
+# Set the working user to myself...
+USER    $USER
+# ... and the working directory to my $HOME inside the container.
+WORKDIR /home/$USER
+# A dummy 'infinite command' like this keeps the container alive so processes on the host
+# can spawn 'exec' sessions inside.
+CMD     "sleep inf"
 
-# A switch statement is used to branch on the symlink this definition was invoked from,
-# allowing multiple different definitions to build on a common base (above.)
-#
-# I have more than just these two, but two is sufficient to get the point across.
-switch (status basename | xargs basename -s .tank)
-# A C development environment for a course on networks that I am currently taking.
-case "p438"
-    set -a EXTENSIONS llvm-vs-code-extensions.vscode-clangd
-    set -a EXTENSIONS vadimcn.vscode-lldb
-    
-    ENV "EXTENSIONS=$EXTENSIONS" 
-    
-    RUN sudo dnf groupinstall -y "C Development Tools and Libraries"
-    RUN sudo dnf install      -y clang clang-tools-extra
-    RUN sudo dnf install      -y pip
-    RUN pip install --user scons
-
-    # Mount my coursework repository into the container $HOME, and nothing else.
-    tankcfg mount type=bind,src=$HOME/Documents/CS,dst=/home/$USER/CS
-# A Rust development environment for my personal projects.
-case "rust"
-    set -a EXTENSIONS vadimcn.vscode-lldb
-    set -a EXTENSIONS tamasfe.even-better-toml
-    set -a EXTENSIONS rust-lang.rust-analyzer
-    
-    ENV "EXTENSIONS=$EXTENSIONS" 
-    ENV "CARGO_INSTALL_ROOT=/home/$USER/.local"
-    
-    RUN sh -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
-
-    # Rust needs a C/++ toolchain for building foreign dependencies.
-    RUN sudo dnf groupinstall -y "Development Tools"
-    RUN sudo dnf groupinstall -y "C Development Tools and Libraries"
-    RUN mkdir -p /home/$USER/.local/bin
-    
-    # Mount my projects directory, as well as the host user binary directory.
-    #
-    # Combined with setting CARGO_INSTALL_ROOT, this means I can 'cargo install' binaries
-    # inside the container and use them outside it.
-    tankcfg mount type=bind,src=$HOME/Documents/Projects,dst=/home/$USER/Projects
-    tankcfg mount type=bind,src=$HOME/.local/bin/,dst=/home/$USER/.local/bin/
-# Nominally unreachable.
-case "*"
-    exit 1
-end
-
-# Commit the container, basing the name on the symlink used to invoke this definition.
-buildah commit $ctr localhost/(status basename | xargs basename -s .tank)
+# Commit the image.
+COMMIT localhost/base
 ```
-
-The file layout for this particular definition looks similar to this:
 
 ```sh
-# Using symbolic links for "branching builds" like this is one of my pet tricks, but it's not required!
-base.tank # Singular authoritative definition
-p438.tank # Symbolic link to base.tank
-rust.tank # Symbolic link to base.tank
+#!/usr/bin/env fish
+#~ depends_on = ["base"]
+# Box is capable of computing (and following) 
+# a dependency graph for your definitions via the `depends_on` metadata key.
+
+FROM localhost/base
+
+ENV "CARGO_INSTALL_ROOT=/home/$USER/.cargo/install"
+
+RUN sh -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+
+# Rust needs a C/++ toolchain for building foreign dependencies.
+RUN sudo dnf groupinstall -y "Development Tools"
+RUN sudo dnf groupinstall -y "C Development Tools and Libraries"
+RUN mkdir -p /home/$USER/.local/bin
+
+# Mount my projects directory, as well as a host user binary directory.
+#
+# Combined with setting CARGO_INSTALL_ROOT, this means I can 'cargo install' binaries
+# inside the container and use them outside it.
+tankcfg mount type=bind,src=$HOME/Documents/Projects,dst=/home/$USER/Projects
+tankcfg mount type=bind,src=$HOME/.local/bin/cargo,dst=/home/$USER/.cargo/install/bin
+
+# Commit the container, basing the name on the symlink used to invoke this definition.
+COMMIT localhost/rust
 ```
 
-While Fishtank may be branded as an "interactive" container manager, it works just as well for containerized services. This definition is all I need for my Jellyfin server, including support for AMD hardware acceleration:
+While Box may be branded as an "interactive" container manager, it works just as well for containerized services. This definition is all I need for my Jellyfin server, including support for AMD hardware acceleration:
 
 ```sh
 #!/usr/bin/env fish
 
-set ctr (buildah from jellyfin/jellyfin:latest)
+FROM jellyfin/jellyfin:latest
 
-tankcfg preset bind-fix
+PRESET bind-fix
 
-tankcfg device /dev/dri/renderD128 
-tankcfg mount type=bind,src=$HOME/Executable/Jellyfin/config,dst=/config
-tankcfg mount type=bind,src=$HOME/Executable/Jellyfin/cache,dst=/cache
-tankcfg mount type=bind,src=$HOME/Videos/DLNA,dst=/media,ro=true
+CFG device /dev/dri/renderD128 
+CFG mount type=bind,src=$HOME/Executable/Jellyfin/config,dst=/config
+CFG mount type=bind,src=$HOME/Executable/Jellyfin/cache,dst=/cache
+CFG mount type=bind,src=$HOME/Videos/DLNA,dst=/media,ro=true
 
-tankcfg args "--net=host" 
-tankcfg args "--group-add=105" 
-tankcfg args "--user=1000:1000"
+CFG args "--net=host" 
+CFG args "--group-add=105" 
+CFG args "--user=1000:1000"
 
-buildah commit $ctr jellyfin
+COMMIT jellyfin
 ```
 
+In testing, I've had success with everything from a Minecraft server to [Ollama](https://ollama.com) by simply adapting existing Docker instructions.
 
 ## FAQ
 
-### "Why `fish` instead of POSIX `sh`?"
-Well, I *could* have written Fishtank in POSIX `sh` - in the same sense that I *could* stick a fork into my eye repeatedly.
-
-More seriously - I started this as an excuse to learn some scripting after migrating from `bash` to `fish`, and it matured into something I thought others might find useful.
-
-If you prefer a different shell, you can still use Fishtank! The scripts are self-contained and properly shebanged, so simply installing `fish` and placing them somewhere in your `$PATH` should work fine.
-
 ### "How does this compare to Toolbx or Distrobox?"
-It depends!
+It depends! I definitely wouldn't make a strict "better or worse" call.
 
 I used to heavily rely on Toolbx for my development environments, and I also dabbled with Distrobox. Both are excellent tools, but I have one big gripe with both: host integration.
 
 - Toolbx automatically runs as `--privileged` with (among other things) your entire `$HOME` and `$XDG_RUNTIME_DIR` mounted into the container, and offers no way to opt-out.
 - Distrobox is similar, but does offer some opt-outs. You can also choose to use an alternate `$HOME` on the host (not inside the container.)
 
-Fishtank, by contrast, is entirely opt-in when it comes to host integrations. You get to choose precisely what (if anything) is shared.
+As a Silverblue user, this tight coupling with my "pure" host always left a bad taste in my mouth. Box, by contrast, is entirely opt-in when it comes to host integrations. You get to choose precisely what (if anything) is shared.
 
-Fishtank also requires that every container be associated with a "definition," rather than defaulting to a standard "toolbox" image for each container. These can either be standard Containerfiles, or they can use Fishtank's custom shell-based format to declare runtime arguments (like mounts)[^3] during build time.
+> This is good for "soft" security against stuff like supply chain attacks; if (some day) I execute a `build.rs` that tries to hijack my session tokens or wipe my system - no big deal.
+
+Box also requires that every container be associated with a "definition," rather than defaulting to a standard "toolbox" image for each container. These can either be standard Containerfiles, or they can use Box's custom shell-based format to declare runtime arguments (like mounts) during build time.
+
+> I find this particularly advantageous for ensuring a consistent environment between my desktop and my laptop. It also makes for a good "lazy man's NixOS" on my Pi-hole server.
 
 So:
 - If you don't mind the above caveats and want containerized environments that Just Work with the host, use Toolbx or Distrobox.
-- If you *do* mind the above caveats and/or want some declarative-ness in your containers, give Fishtank a try.
-
+- If you *do* mind the above caveats and/or want some declarative-ness in your containers, give Box a try.
 
 ### "Why not just use Kubernetes YAML or `compose`?"
 A few reasons:
 
-1. Separating the information on how to *build* the image from information on how to *run* it is lame, especially for Fishtank's target use case of "bespoke interactive containers."
-2. Kubernetes YAML is massively overcomplicated, and the `podman` version of `compose` was somewhat buggy when I tried it.
-3. YAML sucks.
+1.  For Box's target use case of "bespoke interactive containers," separating the information on how to *build* the image from information on how to *run* it is lame.
+    - I am also an avowed [locality of behavior](https://htmx.org/essays/locality-of-behaviour/) enjoyer.
+2. Kubernetes YAML is massively overcomplicated for what I wanted to do, and the `podman` version of `compose` was somewhat buggy when I tried it.
+3. YAML is... YAML.
 
-[^1]: Only ~1000 lines of pure Fish shell code.
+### "Creating containers (`up`) is extremely slow."
 
-[^2]: Fishtank was developed on a system that uses GNU Coreutils and GNU `libc` - if you find that Fishtank doesn't work with alternative implementations, please file an issue!
+This seems to be a `podman` issue with the default `overlay` storage driver on BTRFS (and possibly ZFS) systems that causes expensive copies during container creation.
+I followed [this](https://www.jwillikers.com/podman-with-btrfs-and-zfs) guide to switch my storage driver to use BTRFS subvolumes and experienced massive speedups.
 
-[^3]: If you are wondering how this works: Fishtank bakes the arguments you provide at build time into the image using OCI annotations, then reads them out and applies them when creating a container from the image.
+[^1]: Single Rust binary compiled from ~2000 lines of boring plumbing code. Red Hat and the OCI have already done all the heavy lifting here!
