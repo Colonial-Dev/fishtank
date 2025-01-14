@@ -31,7 +31,6 @@ function buildah
             $ctr
 
         set -gx __BOX_BUILD_CTR $ctr
-        echo $ctr
     else
         command buildah $argv
 
@@ -46,7 +45,7 @@ function FROM
 end
 
 function COMMIT
-    buildah commit $argv
+    bx config commit $argv
 end
 
 function RUN

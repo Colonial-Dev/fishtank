@@ -303,7 +303,7 @@ impl Definition {
         Command::new("podman")
             .args([
                 "build",
-                "pull", "--newer",
+                "--pull=newer",
                 "--annotation", "manager=box",
             ])
             .arg("--annotation")
@@ -315,9 +315,9 @@ impl Definition {
             .arg("--annotation")
             .arg(tree)
             .arg("--tag")
-            .arg(name)
+            .arg(self.name())
             .arg("--file")
-            .arg(path)
+            .arg(&self.path)
             .spawn_ok()
             .context("Fault when evaluating Containerfile-based definition")?;
 

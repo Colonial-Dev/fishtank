@@ -13,7 +13,6 @@ buildah() {
             "$ctr"
 
         export __BOX_BUILD_CTR="$ctr"
-        echo "$ctr"
     else
         command buildah "$@"
     fi
@@ -24,7 +23,7 @@ FROM() {
 }
 
 COMMIT() {
-    buildah commit "$@"
+    bx config commit "$@"
 }
 
 RUN() {
@@ -69,6 +68,10 @@ USER() {
 
 WORKDIR() {
     buildah config --workingdir "$@" $__BOX_BUILD_CTR
+}
+
+CFG() {
+    bx config "$@"
 }
 
 PRESET() {

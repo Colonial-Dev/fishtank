@@ -419,22 +419,64 @@ fn evaluate_config(operation: String, args: Vec<String>) -> Result<()> {
         // because correctly handling arguments split by --
         // in shellcode is... non trivial.
         "run" => {
-            Command::new("buildah")
-                .arg("run")
-                .args(trailing)
-                .arg(ctr)
-                .arg("--")
-                .args(args)
-                .spawn_ok()?
+            let mut c = Command::new("buildah");
+
+            c.arg("run");
+
+            if trailing.is_empty() {
+                c
+                    .arg(ctr)
+                    .arg("--")
+                    .args(args);
+            }
+            else {
+                c
+                    .args(args)
+                    .arg(ctr)
+                    .arg("--")
+                    .args(trailing);
+            }
+
+            c.spawn_ok()?
         }
         "add" => {
-            Command::new("buildah")
-                .arg("add")
-                .args(args)
-                .arg(ctr)
-                .args(trailing)
-                .spawn_ok()?
-        }
+            let mut c = Command::new("buildah");
+
+            c.arg("add");
+
+            if trailing.is_empty() {
+                c
+                    .arg(ctr)
+                    .args(args);
+            }
+            else {
+                c
+                    .args(args)
+                    .arg(ctr)
+                    .args(trailing);
+            }
+
+            c.spawn_ok()?
+        },
+        "commit" => {
+            let mut c = Command::new("buildah");
+
+            c.arg("commit");
+
+            if trailing.is_empty() {
+                c
+                    .arg(ctr)
+                    .args(args);
+            }
+            else {
+                c
+                    .args(args)
+                    .arg(ctr)
+                    .args(trailing);
+            }
+
+            c.spawn_ok()?
+        },
         "preset" => {
             evaluate_preset(&ctr, args)?
         },

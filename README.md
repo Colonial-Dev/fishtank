@@ -26,10 +26,10 @@ Bring your existing Docker-style container definitions...
     <img src=".github/README_A.png">
 </p>
 
-Lightweight[^1], easy to install, and works on any Linux machine with `podman` and a compatible shell (POSIX-compliant or `fish`.)
+Lightweight[^1], easy to install, and works on any Linux machine with `podman`.
 
 ## Installation
-Before installing, make sure you have `podman` and a supported shell (either `fish` or anything POSIX-compliant) installed on your system.
+Before continuing, make sure you have `podman` (and `buildah`, if not included with `podman`) installed.
 
 ### From Source (Recommended)
 Build-time dependencies:
@@ -52,30 +52,30 @@ Box requires a definition for each container you'd like to create. Definitions c
 - Standard Container/Dockerfiles - just add `#~ containerfile = true` to the text and you're good to go.
 - Shell scripts (POSIX or `fish`) that run in a special harness. This injects additional functions and wraps a few others to provide additional functionality not present in Containerfiles, like the ability to declare runtime arguments such as mounts.
 
-Either type must be stored with the file extension `.box` under either:
+Either type must be stored with the file extension `.box` under one of:
 
 - `$BOX_DEFINITION_DIR`
 - `$XDG_CONFIG_HOME/box`
 - `$HOME/.config/box`
 
-... in that order.
+Box checks in that order, using the first valid directory it finds.
 
-To create and edit a new definition, you can simply run `box create <NAME>`. This will create the file and open it using your `$EDITOR`.
+To create and edit a new definition, you can simply run `bx create <NAME>`. This will create the file and open it using your `$EDITOR`.
 
-`box edit <NAME>` can be used to alter existing definitions; both commands will use a temporary file for editing.
+`bx edit <NAME>` can be used to alter existing definitions; both commands will use a temporary file for editing.
 
 Shell-based definitions run in the same directory as the definition, and should look something like the below. I use Fish, but the general structure
 readily translates to POSIX-compatible syntaxes.
 
 ```sh
 # Create a new working container.
-set ctr (FROM fedora-toolbox:latest)
+FROM fedora-toolbox:latest
 
 # Set up the new container...
 RUN dnf install gcc
 
 # Commit the configured container as an image.
-COMMIT $ctr toolbox
+COMMIT toolbox
 ```
 
 The harness for shell-based definitions provides several tools for setting up your container.
@@ -101,7 +101,7 @@ for my development containers.
 
 # Fedora Toolbox is my preferred base, but there are similar images
 # available for distributions like Debian and Arch.
-set ctr (FROM fedora-toolbox:latest)
+FROM fedora-toolbox:latest
 
 # Copy my user into the container.
 PRESET preset cp-user $USER
@@ -128,7 +128,7 @@ WORKDIR /home/$USER
 CMD     "sleep inf"
 
 # Commit the image.
-COMMIT $ctr localhost/base
+COMMIT localhost/base
 ```
 
 ```sh
@@ -137,7 +137,7 @@ COMMIT $ctr localhost/base
 # Box is capable of computing (and following) 
 # a dependency graph for your definitions via the `depends_on` metadata key.
 
-set ctr (FROM localhost/base)
+FROM localhost/base
 
 ENV "CARGO_INSTALL_ROOT=/home/$USER/.cargo/install"
 
@@ -156,7 +156,7 @@ tankcfg mount type=bind,src=$HOME/Documents/Projects,dst=/home/$USER/Projects
 tankcfg mount type=bind,src=$HOME/.local/bin/cargo,dst=/home/$USER/.cargo/install/bin
 
 # Commit the container, basing the name on the symlink used to invoke this definition.
-COMMIT $ctr localhost/rust
+COMMIT localhost/rust
 ```
 
 While Box may be branded as an "interactive" container manager, it works just as well for containerized services. This definition is all I need for my Jellyfin server, including support for AMD hardware acceleration:
@@ -164,7 +164,7 @@ While Box may be branded as an "interactive" container manager, it works just as
 ```sh
 #!/usr/bin/env fish
 
-set ctr (FROM jellyfin/jellyfin:latest)
+FROM jellyfin/jellyfin:latest
 
 PRESET bind-fix
 
@@ -177,7 +177,7 @@ CFG args "--net=host"
 CFG args "--group-add=105" 
 CFG args "--user=1000:1000"
 
-COMMIT $ctr jellyfin
+COMMIT jellyfin
 ```
 
 In testing, I've had success with everything from a Minecraft server to [Ollama](https://ollama.com) by simply adapting existing Docker instructions.
@@ -185,14 +185,14 @@ In testing, I've had success with everything from a Minecraft server to [Ollama]
 ## FAQ
 
 ### "How does this compare to Toolbx or Distrobox?"
-It depends!
+It depends! I definitely wouldn't make a strict "better or worse" call.
 
 I used to heavily rely on Toolbx for my development environments, and I also dabbled with Distrobox. Both are excellent tools, but I have one big gripe with both: host integration.
 
 - Toolbx automatically runs as `--privileged` with (among other things) your entire `$HOME` and `$XDG_RUNTIME_DIR` mounted into the container, and offers no way to opt-out.
 - Distrobox is similar, but does offer some opt-outs. You can also choose to use an alternate `$HOME` on the host (not inside the container.)
 
-Box, by contrast, is entirely opt-in when it comes to host integrations. You get to choose precisely what (if anything) is shared.
+As a Silverblue user, this tight coupling with my "pure" host always left a bad taste in my mouth. Box, by contrast, is entirely opt-in when it comes to host integrations. You get to choose precisely what (if anything) is shared.
 
 > This is good for "soft" security against stuff like supply chain attacks; if (some day) I execute a `build.rs` that tries to hijack my session tokens or wipe my system - no big deal.
 
@@ -216,15 +216,5 @@ A few reasons:
 
 This seems to be a `podman` issue with the default `overlay` storage driver on BTRFS (and possibly ZFS) systems that causes expensive copies during container creation.
 I followed [this](https://www.jwillikers.com/podman-with-btrfs-and-zfs) guide to switch my storage driver to use BTRFS subvolumes and experienced massive speedups.
-
-### "Why Rust?"
-It's my favorite out of the "good for command-line" language pantheon.
-
-The main requirements were:
-- Quick, especially at startup.
-- Space efficient.
-- No runtime dependencies apart from the `podman` suite.
-
-A fast, small, and self-contained binary is one that I can commit to my `dotfiles` repository and forget about. The same cannot be said of an equivalently feature rich Python utility.
 
 [^1]: Single Rust binary compiled from ~2000 lines of boring plumbing code. Red Hat and the OCI have already done all the heavy lifting here!
