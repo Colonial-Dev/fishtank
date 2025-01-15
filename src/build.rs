@@ -8,15 +8,6 @@ use crate::prelude::*;
 use crate::podman::*;
 use crate::CommandExt;
 
-// For POSIX shells - build a script "on the fly" that sources the init using `source <(bx _init posix)`
-// then executes the script in a subshell
-// Something like:
-//
-// source <(bx _init posix)
-// (
-//    # Script contents
-// )
-
 pub type Definitions = Vec<Definition>;
 
 #[derive(Debug, Hash, PartialEq, Eq)]

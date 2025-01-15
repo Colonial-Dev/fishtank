@@ -207,10 +207,9 @@ So:
 ### "Why not just use Kubernetes YAML or `compose`?"
 A few reasons:
 
-1.  For Box's target use case of "bespoke interactive containers," separating the information on how to *build* the image from information on how to *run* it is lame.
-    - I am also an avowed [locality of behavior](https://htmx.org/essays/locality-of-behaviour/) enjoyer.
+1.  For Box's target use case of "bespoke interactive containers," separating the information on how to *build* the image from information on how to *run* it is [lame](https://htmx.org/essays/locality-of-behaviour/).
 2. Kubernetes YAML is massively overcomplicated for what I wanted to do, and the `podman` version of `compose` was somewhat buggy when I tried it.
-3. YAML is... YAML.
+3. YAML is... [yeah](https://github.com/Colonial-Dev/satpaper/blob/b2016c63ffeafc70538fd2b02fa60d1c077fd694/.github/workflows/release.yml#L1-L3).
 
 ### "Creating containers (`up`) is extremely slow."
 

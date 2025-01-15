@@ -93,6 +93,7 @@ Besides the above, Box also polyfills most other directives from the [OCI Contai
 - `ENTRYPOINT`
 - `ENV`
 - `EXPOSE`
+  - Note that this does *not* alter any runtime behavior - it only applies metadata. Use `CFG args -p=xxxx:yyyy` to ensure ports are actually forwarded at runtime.
 - `HEALTHCHECK`
 - `LABEL`
 - `SHELL`
@@ -103,7 +104,7 @@ Besides the above, Box also polyfills most other directives from the [OCI Contai
 
 ### `CFG`
 
-`CFG` is a catch-all tool used to bake runtime arguments (such as mounts) into an image:
+`CFG` is a catch-all tool used to bake runtime arguments (such as mounts)[^1] into an image:
 
 ```sh
 CFG <FUNCTION> [ARGS...]
@@ -175,3 +176,5 @@ trap cp
 ```
 
 This is not included in the POSIX harness, which automatically applies `set -eu` to abort on non-zero exit codes or uses of unset variables.
+
+[^1]: If you're wondering "how the hell does it do that" - it saves them as OCI annotations that are read back at creation time. [Did you know you can just use the ASCII separator characters to separate things?](https://github.com/Colonial-Dev/box/blob/0c45cfe2c51a4ff1c3f62b3f753bcfeab882a56b/src/podman.rs#L341-L352) They're right there. Nobody can stop you.
