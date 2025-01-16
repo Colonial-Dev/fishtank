@@ -132,6 +132,12 @@ fn main() -> Result<()> {
     match args.command {
         Containers  => list_containers()?,
         Definitions => list_definitions()?,
+        Directory   => {
+            println!(
+                "{}",
+                definition_directory()?.to_string_lossy()
+            )
+        },
 
         Create { name } => Definition::create(name)?,
         Edit   { name } => Definition::edit(name)?,

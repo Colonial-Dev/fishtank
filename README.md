@@ -107,7 +107,7 @@ FROM fedora-toolbox:latest
 PRESET cp-user
 # Fix Unix and SELinux permission issues with rootless mounting of host files.
 PRESET bind-fix
-# Mount the SSH agent socket into the container. (Implies bind-fix)
+# Mount the SSH agent socket into the container.
 PRESET ssh-agent
 
 # Copy my GNU Stow .dotfiles directory into the container.
@@ -146,14 +146,9 @@ RUN sh -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- 
 # Rust needs a C/++ toolchain for building foreign dependencies.
 RUN sudo dnf groupinstall -y "Development Tools"
 RUN sudo dnf groupinstall -y "C Development Tools and Libraries"
-RUN mkdir -p /home/$USER/.local/bin
 
-# Mount my projects directory, as well as a host user binary directory.
-#
-# Combined with setting CARGO_INSTALL_ROOT, this means I can 'cargo install' binaries
-# inside the container and use them outside it.
+# Mount my projects directory.
 CFG mount type=bind,src=$HOME/Documents/Projects,dst=/home/$USER/Projects
-CFG mount type=bind,src=$HOME/.local/bin/cargo,dst=/home/$USER/.cargo/install/bin
 
 # Commit the container, basing the name on the symlink used to invoke this definition.
 COMMIT localhost/rust

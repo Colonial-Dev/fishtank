@@ -42,6 +42,8 @@ pub enum Command {
     Definitions,
     /// Delete a container definition.
     Delete { name: String, #[arg(short, long)] yes: bool },
+    /// Output the directory currently being used for definitions.
+    Directory,
     /// Remove managed container(s).
     Down    (ContainerSet),
     /// Edit an existing container definition.
