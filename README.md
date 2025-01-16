@@ -207,13 +207,8 @@ So:
 ### "Why not just use Kubernetes YAML or `compose`?"
 A few reasons:
 
-1.  For Box's target use case of "bespoke interactive containers," separating the information on how to *build* the image from information on how to *run* it is [lame](https://htmx.org/essays/locality-of-behaviour/).
+1.  For Box's target use case of "bespoke interactive containers," separating the information on how to *build* the image from information on how to *run* it is [suboptimal](https://htmx.org/essays/locality-of-behaviour/).
 2. Kubernetes YAML is massively overcomplicated for what I wanted to do, and the `podman` version of `compose` was somewhat buggy when I tried it.
 3. YAML is... [yeah](https://github.com/Colonial-Dev/satpaper/blob/b2016c63ffeafc70538fd2b02fa60d1c077fd694/.github/workflows/release.yml#L1-L3).
-
-### "Creating containers (`up`) is extremely slow."
-
-This seems to be a `podman` issue with the default `overlay` storage driver on BTRFS (and possibly ZFS) systems that causes expensive copies during container creation.
-I followed [this](https://www.jwillikers.com/podman-with-btrfs-and-zfs) guide to switch my storage driver to use BTRFS subvolumes and experienced massive speedups.
 
 [^1]: Single Rust binary compiled from ~2000 lines of boring plumbing code. Red Hat and the OCI have already done all the heavy lifting here!

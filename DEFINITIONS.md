@@ -17,7 +17,7 @@ Currently, only two keys are recognized:
 
 These are the recommended way to write definitions for Box.
 
-## DSL Commands
+## Commands
 
 Box provides (approximate) implementations of all OCI Containerfile operations as shell functions, as well as several additional tools.
 
@@ -136,9 +136,9 @@ PRESET <NAME> [ARGS...]
 | Name | Function | Arguments |
 | ---- | -------- | --------- |
 | `cp-user` | Copies a user from the host into the container. | Optionally takes the name of the user to copy. If one is not provided, it defaults to the user executing the program (i.e. the result of `whoami`.) |
-| `bind-fix` | Fixes permission issues encountered with rootless bind mounts on SELinux systems. | None. |
-| `ssh-agent` | Mounts and exports `SSH_AUTH_SOCK` into the container. Implies `bind-fix`. | None. |
-| `devices` | Mounts `/dev` into the container. Implies `bind-fix` and `--privileged`. | None. |
+| `bind-fix` | Fixes permission issues encountered with rootless bind mounts on SELinux systems. Disables SELinux label separation and maps the host user to the same UID inside the container. | None. |
+| `ssh-agent` | Mounts and exports `SSH_AUTH_SOCK` into the container. | None. |
+| `devices` | Mounts `/dev` into the container. Implies `--privileged`! | None. |
 
 ### `COMMIT`
 > *Corresponding manual page: `buildah commit`*
@@ -177,4 +177,4 @@ trap cp
 
 This is not included in the POSIX harness, which automatically applies `set -eu` to abort on non-zero exit codes or uses of unset variables.
 
-[^1]: If you're wondering "how the hell does it do that" - it saves them as OCI annotations that are read back at creation time. [Did you know you can just use the ASCII separator characters to separate things?](https://github.com/Colonial-Dev/box/blob/0c45cfe2c51a4ff1c3f62b3f753bcfeab882a56b/src/podman.rs#L341-L352) They're right there. Nobody can stop you.
+[^1]: If you're wondering "how the hell does it do that" - it saves them as OCI annotations that are read back at creation time. <br> [Did you know you can just use the ASCII separator characters to separate things?](https://github.com/Colonial-Dev/box/blob/0c45cfe2c51a4ff1c3f62b3f753bcfeab882a56b/src/podman.rs#L341-L352) They're right there. Nobody can stop you.

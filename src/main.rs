@@ -479,6 +479,19 @@ fn evaluate_config(operation: String, args: Vec<String>) -> Result<()> {
         "preset" => {
             evaluate_preset(&ctr, args)?
         },
+        "args" => {
+            if args.is_empty() {
+                bail!("Configuration value not specified")
+            }
+
+            for a in args {
+                push_annotation(
+                    &ctr,
+                    "box.args",
+                    a
+                )?;
+            }
+        }
         o if ANNOTATIONS.contains(&o) => {
             let Some(val) = args.first() else {
                 bail!("Configuration value not specified")
@@ -542,11 +555,6 @@ fn evaluate_preset(ctr: &str, args: &[String]) -> Result<()> {
         return Err(err)
     };
 
-    if matches!(name.as_str(), "bind-fix" | "ssh-agent" | "devices") {
-        push_annotation("box.security-opt", "label=disable")?;
-        push_annotation("box.userns", "keep-id")?;
-    }
-
     match name.as_str() {
         "cp-user" => {
             use uzers::os::unix::UserExt;
@@ -607,7 +615,8 @@ fn evaluate_preset(ctr: &str, args: &[String]) -> Result<()> {
             push_annotation("box.mount", "type=bind,src=/dev,dst=/dev,rslave=true")?;
         },
         "bind-fix" => {
-            // No-op. Covered in the blanket case above.
+            push_annotation("box.security-opt", "label=disable")?;
+            push_annotation("box.userns", "keep-id")?;
         }
         _ => {
             let err = eyre!("Unrecognized preset {name}")

@@ -130,6 +130,8 @@ impl Definition {
         use std::fs;
 
         let path = p.as_ref().to_owned();
+        
+        debug!("Attempting to fetch definition from path {path:?}");
 
         let data = fs::read_to_string(&path)
             .context("Failed to read in definition data")
@@ -161,6 +163,8 @@ impl Definition {
 
         let tree = hash;
         
+        debug!("Fetched definition from path {path:?}");
+
         Ok(Self { path, bang, hash, tree, meta })
     }
 
@@ -516,6 +520,8 @@ pub fn definition_directory() -> Result<PathBuf> {
 }
 
 pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {   
+    use colored::Colorize;
+    
     use petgraph::Graph;
     use petgraph::algo::toposort;
     use petgraph::visit::Dfs;
@@ -590,6 +596,13 @@ pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
         deps.push(def);
         names.insert(name);
     }
+
+    eprintln!(
+        "Building {} definitions ({} requested, {} transitive)",
+        (set.len() + deps.len()).to_string().green().bold(),
+        set.len().to_string().green().bold(),
+        deps.len().to_string().yellow().bold(),
+    );
 
     set.extend(deps);
 
@@ -706,7 +719,15 @@ pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
         
         if *own != def.hash || *tree != def.tree {
             def.build()?;
+            continue
         }
+
+        // If we got here, the build was skipped.
+        eprintln!(
+            "{} {} (unchanged)",
+            "Skipped definition".bright_white().bold(),
+            def.name().yellow().bold(),
+        )
     }
 
     Ok(())
