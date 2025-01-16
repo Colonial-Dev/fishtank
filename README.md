@@ -125,6 +125,9 @@ USER    $USER
 WORKDIR /home/$USER
 # A dummy 'infinite command' like this keeps the container alive so processes on the host
 # can spawn 'exec' sessions inside.
+#
+# You could also use a minimal `init` implementation, such as `tini`,
+# to ensure that zombie processes are reaped correctly.
 CMD     "sleep inf"
 
 # Commit the image.

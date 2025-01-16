@@ -319,10 +319,10 @@ impl Image {
     }
 
     pub fn instantiate(&self, replace: bool) -> Result<()> {
-        self.instantiate_ext(replace, false, &[])
+        self.instantiate_ext(replace, &[])
     }
 
-    pub fn instantiate_ext(&self, replace: bool, ephemeral: bool, addl_args: &[String]) -> Result<()> {
+    pub fn instantiate_ext(&self, replace: bool, ephemeral_args: &[String]) -> Result<()> {
         let name = self.annotation("box.name")
             .expect("Name annotation should be set");
 
@@ -358,9 +358,9 @@ impl Image {
             )
         }
 
-        let name_args = match ephemeral {
-            false => vec!["-d", "--name", name, "--hostname", name],
-            true  => vec!["--rm", "-it", "--hostname", name]
+        let name_args = match ephemeral_args.is_empty() {
+            false => vec!["--rm", "-it", "--hostname", name],
+            true  => vec!["-d", "--name", name, "--hostname", name]
         };
 
         let mut c = Command::new("podman");
@@ -369,7 +369,6 @@ impl Image {
             .arg("run")
             .args(name_args)
             .args(args)
-            .args(addl_args)
             .args([
                 "--annotation",
                 "manager=box"
@@ -378,11 +377,12 @@ impl Image {
             .arg(format!("box.name={name}"))
             .arg("--annotation")
             .arg(format!("box.hash={hash}"))
-            .arg(name);
+            .arg(name)
+            .args(ephemeral_args);
 
-        match ephemeral {
-            false => c.output_ok().map(drop),
-            true  => c.spawn_ok()
+        match ephemeral_args.is_empty() {
+            false =>  c.spawn_ok(),
+            true  => c.output_ok().map(drop)
         }.context("Fault when instantiating image")?;
 
         Ok(())

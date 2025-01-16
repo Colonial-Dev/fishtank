@@ -165,18 +165,14 @@ fn main() -> Result<()> {
 
             ctr.exec(&path, &args)?;
         },
-        Ephemeral { name, path, args } => {
+        Ephemeral { name, path, mut args } => {
             let image = Image::from_id(&name)?;
 
-            let args = match args.len() {
-                0 => format!("--entrypoint={path}"),
-                _ => format!("--entrypoint={path} {}", args.join(" "))
-            };
+            args.insert(0, path);
 
             image.instantiate_ext(
                 false,
-                true,
-                &[args]
+                &args
             )?;
         },
 
@@ -485,7 +481,7 @@ fn evaluate_config(operation: String, args: Vec<String>) -> Result<()> {
         "preset" => {
             evaluate_preset(&ctr, args)?
         },
-        "args" => {
+        o if ANNOTATIONS.contains(&o) => {
             if args.is_empty() {
                 bail!("Configuration value not specified")
             }
@@ -493,21 +489,10 @@ fn evaluate_config(operation: String, args: Vec<String>) -> Result<()> {
             for a in args {
                 push_annotation(
                     &ctr,
-                    "box.args",
+                    &format!("box.{o}"),
                     a
                 )?;
             }
-        }
-        o if ANNOTATIONS.contains(&o) => {
-            let Some(val) = args.first() else {
-                bail!("Configuration value not specified")
-            };
-
-            push_annotation(
-                &ctr,
-                &format!("box.{o}"),
-                val
-            )?;
         },
         o if CONFIG_FLAGS.contains(&o) => {
             if args.is_empty() {
