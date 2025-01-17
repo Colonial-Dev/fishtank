@@ -10,24 +10,36 @@ use crate::CommandExt;
 
 pub type Definitions = Vec<Definition>;
 
+/// Represents a Box definition (script or Containerfile.)
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Definition {
+    /// The path to the definition.
     pub path: PathBuf,
+    /// The first line of the definition.
     pub bang: String,
+    /// The [`seahash`] of the definition.
     pub hash: u64,
+    /// The combined hash of the definition and all of its dependencies.
+    /// 
+    /// Not computed by constructors; defaults to the same value as `hash`.
     pub tree: u64,
+    /// Deserialized TOML metadata.
     pub meta: Metadata,
 }
 
+/// Deserialized TOML metadata from a definition.
 #[derive(Debug, Hash, PartialEq, Eq, Deserialize)]
 pub struct Metadata {
+    /// The name of any definitions this one depends on, if any.
     #[serde(default)]
     pub depends_on    : Vec<String>,
+    /// Whether or not this definition is an OCI Containerfile (default: false.)
     #[serde(default)]
     pub containerfile : bool,
 }
 
 impl Definition {
+    /// Enumerate all definitions.
     pub fn enumerate() -> Result<Definitions> {
         use std::fs;
         use std::ffi::OsStr;
@@ -80,6 +92,7 @@ impl Definition {
         }
     }
 
+    /// Given a name, attempt to find and fetch the corresponding definition.
     pub fn find(name: &str) -> Result<Self> {
         use std::fs;
         use std::ffi::OsStr;
@@ -109,6 +122,7 @@ impl Definition {
         }
     }
 
+    // Given a name, determines whether or not a matching definition exists.
     pub fn exists(name: &str) -> Result<bool> {
         use std::fs;
 
@@ -126,6 +140,7 @@ impl Definition {
             })
     }
 
+    /// Given a path, attempts to read in its contents and parse it into a well-formed definition.
     pub fn from_path(p: impl AsRef<Path>) -> Result<Self> {
         use std::fs;
 
@@ -168,6 +183,7 @@ impl Definition {
         Ok(Self { path, bang, hash, tree, meta })
     }
 
+    /// Get the name of the definition (file name minus extension.)
     pub fn name(&self) -> &str {
         use std::ffi::OsStr;
 
@@ -178,10 +194,12 @@ impl Definition {
             .expect("Definition name should be valid UTF-8")
     }
 
+    /// Get the list of all definitions this one depends on.
     pub fn depends_on(&self) -> &[String] {
         &self.meta.depends_on
     }
 
+    /// Build the definition.
     pub fn build(&self) -> Result<()> {
         use std::fs;
         use colored::Colorize;
@@ -364,6 +382,7 @@ impl Definition {
 }
 
 impl Definition {
+    /// Create a new definition file with the provided name.
     pub fn create(name: String) -> Result<()> {
         use std::fs::File;
         use dialoguer::Editor;
@@ -403,6 +422,7 @@ impl Definition {
         Ok(())
     }
 
+    /// Edit the specified definition file.
     pub fn edit(name: String) -> Result<()> {
         use dialoguer::Editor;
 
@@ -438,6 +458,7 @@ impl Definition {
         Ok(())
     }
 
+    /// Delete the specified definition file.
     pub fn delete(name: String, yes: bool) -> Result<()> {
         use dialoguer::Confirm;
 
@@ -474,6 +495,12 @@ impl Definition {
     }
 }
 
+/// Determines the directory to use for definitions.
+/// 
+///  Existence checks these options, in this order:
+/// - `$BOX_DEFINITION_DIR`
+/// - `$XDG_CONFIG_HOME/box`
+/// - `$HOME/.config/box`
 pub fn definition_directory() -> Result<PathBuf> {
     let options = || {
         if let Ok(dir) = std::env::var("BOX_DEFINITION_DIR") {
@@ -519,6 +546,10 @@ pub fn definition_directory() -> Result<PathBuf> {
     }
 }
 
+/// Given a slice of definition names, attempt to fetch and build them.
+/// 
+/// - Alternately, if `all` is true, this function will enumerate all definitions and attempt to build them.
+/// - By default, Box skips building a definition if both it and its dependencies are unchanged; `force` overrides this behavior.
 pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {   
     use colored::Colorize;
     

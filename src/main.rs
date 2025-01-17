@@ -59,6 +59,8 @@ fn main() -> Result<()> {
     ensure("podman")?;
     ensure("buildah")?;
 
+    // Given a list of container names, this will
+    // retrieve them in well-typed form and map an operation over them (complete with a progress spinner.)
     let map_set = |set: &ContainerSet, func: fn(&Container) -> Result<()>, op: &str| -> Result<_> {
         let style = format!(
             "{{spinner}} {op} {{msg:.green}}..."
@@ -104,6 +106,7 @@ fn main() -> Result<()> {
         Ok(())
     };
 
+    // Instantiates containers from a slice of images, with a progress spinner.
     let instantiate = |set: &[Image], replace| -> Result<_> {
         let style = ProgressStyle::with_template("{spinner} Creating {msg:.green}...")
             .unwrap();
@@ -177,7 +180,6 @@ fn main() -> Result<()> {
         },
 
         Build { defs, all, force } => build_set(&defs, all, force)?,
-
 
         Start   (set) => map_set(&set, Container::start, "Starting")?,
         Stop    (set) => map_set(&set, Container::stop, "Stopping")?,
@@ -418,7 +420,7 @@ fn evaluate_config(operation: String, args: Vec<String>) -> Result<()> {
     match operation.as_str() {
         // We handle ADD/COPY and RUN in Rust code,
         // because correctly handling arguments split by --
-        // in shellcode is... non trivial.
+        // in shell is... non trivial.
         "run" => {
             let mut c = Command::new("buildah");
 
@@ -445,6 +447,10 @@ fn evaluate_config(operation: String, args: Vec<String>) -> Result<()> {
 
             c.arg("add");
 
+            // This shuffling might seem a bit opaque,
+            // but it simply exists to handle two possible cases:
+            // - '--' in input; user is providing additional args to the underlying buildah invocation
+            // - Inverse of above.
             if trailing.is_empty() {
                 c
                     .arg(ctr)
@@ -486,6 +492,7 @@ fn evaluate_config(operation: String, args: Vec<String>) -> Result<()> {
                 bail!("Configuration value not specified")
             }
 
+            // Gracefully handle the case where multiple values are provided.
             for a in args {
                 push_annotation(
                     &ctr,
@@ -493,21 +500,6 @@ fn evaluate_config(operation: String, args: Vec<String>) -> Result<()> {
                     a
                 )?;
             }
-        },
-        o if CONFIG_FLAGS.contains(&o) => {
-            if args.is_empty() {
-                bail!("Configuration value not specified")
-            };
-
-            Command::new("buildah")
-                .arg("config")
-                .arg(
-                    format!("--{o}")
-                )
-                .args(args)
-                .arg(ctr)
-                .spawn_ok()
-                .context("Fault when seting build-time configuration flag")?;
         },
         _ => {
             let err = eyre!("Unknown configuration option {operation}")
@@ -520,6 +512,7 @@ fn evaluate_config(operation: String, args: Vec<String>) -> Result<()> {
     Ok(())
 }
 
+/// Evaluates a definition script "preset."
 fn evaluate_preset(ctr: &str, args: &[String]) -> Result<()> {
     use std::ffi::OsString;
     use std::process::Command;
@@ -559,6 +552,8 @@ fn evaluate_preset(ctr: &str, args: &[String]) -> Result<()> {
             let user = uzers::get_user_by_name(&name)
                 .expect("Current user should exist");
             
+            // If your username isn't Unicode... honestly,
+            // I'll be impressed enough to correct this to do proper OsString fiddling.
             let name = name.to_string_lossy();
 
             let uid = user.uid();
@@ -619,6 +614,10 @@ fn evaluate_preset(ctr: &str, args: &[String]) -> Result<()> {
 
     Ok(())
 }
+
+/// Boilerplate reduction extension trait. Wraps the `spawn` and `output` methods
+/// on [`Command`](std::process::Command) to automatically generate eyre-compatible errors
+/// on failure.
 pub trait CommandExt {
     /// Extension method.
     /// 

@@ -9,6 +9,7 @@ use crate::CommandExt;
 pub type Containers = Vec<Container>;
 pub type Images     = Vec<Image>;
 
+/// List of annotations that can be modified by CFG.
 pub const ANNOTATIONS: [&str; 12] = [
     "args",
     "cap-add",
@@ -24,18 +25,9 @@ pub const ANNOTATIONS: [&str; 12] = [
     "secret"
 ];
 
-pub const CONFIG_FLAGS: [&str; 9] = [
-    "entrypoint",
-    "env",
-    "healthcheck",
-    "hostname",
-    "port",
-    "shell",
-    "user",
-    "volume",
-    "workingdir"
-];
-
+/// Represents a Podman container.
+/// 
+/// Deserialized from Podman command line JSON; not guaranteed to be up to date!
 #[derive(Debug)]
 pub struct Container {
     pub id          : String,
@@ -45,7 +37,12 @@ pub struct Container {
 }
 
 impl Container {
+    /// Given an ID (hash or human-readable name), attempt to fetch and deserialize the corresponding
+    /// container.
     pub fn from_id(id: &str) -> Result<Self> {
+        // These structs are all intermediary; they are only needed
+        // to represent the nested nature of Podman's JSON output.
+
         #[derive(Debug, Deserialize)]
         struct State {
             #[serde(rename = "Status")]
@@ -98,6 +95,7 @@ impl Container {
         })
     }
 
+    /// Enumerate all containers *managed by Box* (**NOT** every container on the system.)
     pub fn enumerate() -> Result<Containers> {
         let o = Command::new("podman")
             .args([
@@ -135,6 +133,7 @@ impl Container {
         Ok(out)
     }
 
+    /// Check whether or not a container with the provided ID exists.
     pub fn exists(id: &str) -> Result<bool> {
         let output = Command::new("podman")
             .args([
@@ -150,10 +149,13 @@ impl Container {
         )
     }
 
+    /// Check if the container is started (`running` state.)
     pub fn started(&self) -> bool {
         self.state == "running"
     }
 
+    /// Fetch a reference to the value associated with the provided annotation key,
+    /// if one exists.
     pub fn annotation(&self, key: &str) -> Option<&str> {
         self
             .annotations
@@ -161,6 +163,7 @@ impl Container {
             .map(String::as_str)
     }
 
+    /// Start the container.
     pub fn start(&self) -> Result<()> {
         debug!("Starting container {}...", self.id);
 
@@ -173,6 +176,7 @@ impl Container {
         Ok(())
     }
 
+    /// Restart the container.
     pub fn restart(&self) -> Result<()> {
         debug!("Restarting container {}...", self.id);
 
@@ -189,6 +193,7 @@ impl Container {
         Ok(())
     }
 
+    /// Stop the container.
     pub fn stop(&self) -> Result<()> {
         debug!("Stopping container {}...", self.id);
 
@@ -205,6 +210,7 @@ impl Container {
         Ok(())
     }
 
+    /// Remove the container.
     pub fn down(&self) -> Result<()> {
         debug!("Removing container {}...", self.id);
         
@@ -221,6 +227,9 @@ impl Container {
         Ok(())
     }
 
+    /// Execute `$SHELL` inside the container.
+    /// 
+    /// The value of `$SHELL` inside the container is used rather than the one on the host.
     pub fn enter(&self) -> Result<()> {
             Command::new("podman")
                 .arg("exec")
@@ -236,6 +245,7 @@ impl Container {
         Ok(())
     }
 
+    /// Execute the provided command inside the container.
     pub fn exec(&self, path: &str, args: &[String]) -> Result<()> {
         Command::new("podman")
             .arg("exec")
@@ -251,6 +261,9 @@ impl Container {
     }
 }
 
+/// Represents a Podman OCI iamge.
+/// 
+/// Deserialized from Podman command line JSON; not guaranteed to be up to date!
 #[derive(Debug, Deserialize)]
 pub struct Image {
     #[serde(rename = "Id")]
@@ -260,6 +273,8 @@ pub struct Image {
 }
 
 impl Image {
+    /// Given an ID (hash or human-readable name), attempt to fetch and deserialize the corresponding
+    /// image.
     pub fn from_id(id: &str) -> Result<Self> {
         let raw_json = Command::new("podman")
             .args([
@@ -284,6 +299,7 @@ impl Image {
         Ok(out)
     }
 
+    /// Enumerate all images *managed by Box* (**NOT** every image on the system.)
     pub fn enumerate() -> Result<Images> {
         let o = Command::new("podman")
             .args([
@@ -318,10 +334,16 @@ impl Image {
         Ok(out)
     }
 
+    /// Instantiate a container from the image, with no special arguments.
+    /// 
+    /// `replace` controls whether or not the new container should overwrite
+    /// an existing one with the same name.
     pub fn instantiate(&self, replace: bool) -> Result<()> {
         self.instantiate_ext(replace, &[])
     }
 
+    /// Extended instantiation method, with support for overriding the default command
+    /// (ephemeral mode.)
     pub fn instantiate_ext(&self, replace: bool, ephemeral_args: &[String]) -> Result<()> {
         let name = self.annotation("box.name")
             .expect("Name annotation should be set");
@@ -388,6 +410,7 @@ impl Image {
         Ok(())
     }
 
+    /// Get the value of an annotation, if it exists.
     pub fn annotation(&self, key: &str) -> Option<&str> {
         self
             .annotations
@@ -396,6 +419,8 @@ impl Image {
     }
 }
 
+/// Append a value to the specified annotation on the provided container. Each item is separated with
+/// `\x1F` (the ASCII unit separator character.)
 pub fn push_annotation(ctr: &str, key: &str, data: &str) -> Result<()> {
     let format_str = format!(
         "{{{{index .ImageAnnotations \"{}\"}}}}",
@@ -422,6 +447,8 @@ pub fn push_annotation(ctr: &str, key: &str, data: &str) -> Result<()> {
     write_annotation(ctr, key, old)
 }
 
+/// Write a value to the specified annotation on the provided container.
+/// Existing data is
 pub fn write_annotation(ctr: &str, key: &str, data: Vec<&str>) -> Result<()> {
     let mapping = format!(
         "{key}={}",
