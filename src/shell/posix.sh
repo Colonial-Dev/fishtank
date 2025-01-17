@@ -19,23 +19,23 @@ buildah() {
 }
 
 FROM() {
-    buildah from "$@"
+    buildah from $@
 }
 
 COMMIT() {
-    bx config commit "$@"
+    bx config commit $@
 }
 
 RUN() {
-    bx config run "$@"
+    bx config run $@
 }
 
 ADD() {
-    bx config add "$@"
+    bx config add $@
 }
 
 COPY() {
-    ADD "$@"
+    ADD $@
 }
 
 CMD() {
@@ -82,13 +82,12 @@ STOPSIGNAL() {
     buildah config --stop-signal "$@" $__BOX_BUILD_CTR
 }
 
-
 CFG() {
-    bx config "$@"
+    bx config $@
 }
 
 PRESET() {
-    bx config preset "$@"
+    bx config preset $@
 }
 
 cd $__BOX_BUILD_DIR

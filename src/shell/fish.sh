@@ -61,47 +61,47 @@ function COPY
 end
 
 function CMD
-    buildah config --cmd $argv $__BOX_BUILD_CTR
+    buildah config --cmd "$argv" $__BOX_BUILD_CTR
 end
 
 function LABEL
-    buildah config --label $argv $__BOX_BUILD_CTR
+    buildah config --label "$argv" $__BOX_BUILD_CTR
 end
 
 function EXPOSE
-    buildah config --port $argv $__BOX_BUILD_CTR
+    buildah config --port "$argv" $__BOX_BUILD_CTR
 end
 
 function ENV
-    buildah config --env $argv $__BOX_BUILD_CTR
+    buildah config --env "$argv" $__BOX_BUILD_CTR
 end
 
 function ENTRYPOINT
-    buildah config --entrypoint $argv $__BOX_BUILD_CTR
+    buildah config --entrypoint "$argv" $__BOX_BUILD_CTR
 end
 
 function VOLUME
-    buildah config --volume $argv $__BOX_BUILD_CTR
+    buildah config --volume "$argv" $__BOX_BUILD_CTR
 end
 
 function USER
-    buildah config --user $argv $__BOX_BUILD_CTR
+    buildah config --user "$argv" $__BOX_BUILD_CTR
 end
 
 function WORKDIR
-    buildah config --workingdir $argv $__BOX_BUILD_CTR
+    buildah config --workingdir "$argv" $__BOX_BUILD_CTR
 end
 
 function SHELL
-    buildah config --shell $argv $__BOX_BUILD_CTR
+    buildah config --shell "$argv" $__BOX_BUILD_CTR
 end
 
 function HEALTHCHECK
-    buildah config --healthcheck $argv $__BOX_BUILD_CTR
+    buildah config --healthcheck "$argv" $__BOX_BUILD_CTR
 end
 
 function STOPSIGNAL
-    buildah config --stop-signal $argv $__BOX_BUILD_CTR
+    buildah config --stop-signal "$argv" $__BOX_BUILD_CTR
 end
 
 function CFG
