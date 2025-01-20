@@ -77,7 +77,10 @@ impl Definition {
                 .into_iter()
                 .map(Result::unwrap_err)
                 .fold(eyre!("Failed to load and parse definition(s)"), |acc, err| {
-                    acc.section(err)
+                    let section = format!("{err:?}")
+                        .header("Sub-error:");
+
+                    acc.section(section)
                 });
 
             Err(err)
@@ -148,8 +151,28 @@ impl Definition {
         
         debug!("Attempting to fetch definition from path {path:?}");
 
+        if path
+            .symlink_metadata()
+            .context("Fault when checking definition file matadata")
+            .suggestion("Do you have permission issues?")?
+            .is_symlink() && !path.exists()
+        {
+            let err = eyre!(
+                "Definition at path {} is a broken symbolic link",
+                path.to_string_lossy()
+            )
+            .suggestion("You're probably using some sort of dotfiles manager - is it out of sync?");
+
+            return Err(err)
+        }
+
         let data = fs::read_to_string(&path)
-            .context("Failed to read in definition data")
+            .context(
+                format!(
+                    "Failed to read in definition data at path {}",
+                    path.to_string_lossy()
+                )
+            )
             .suggestion("Do you have permission issues or non-UTF-8 data?")?;
 
         let bang = data 
@@ -218,8 +241,33 @@ impl Definition {
 
         if self.meta.containerfile {
             self.build_containerfile()?;
+            return Ok(())
         }
-        else if self.bang.contains("fish") {
+
+        let script = fs::read_to_string(&self.path)
+            .context("Fault when reading in shell-based definition")?;
+
+        if !script.contains("FROM") {
+            eprintln!(
+                "{}{} {} {}",
+                "Warning".bold().yellow(),
+                ": definition".bold().bright_white(),
+                self.name().bold().green(),
+                "does not contain a FROM invocation".bold().bright_white()
+            )
+        }
+
+        if !script.contains("COMMIT") {
+            eprintln!(
+                "{}{} {} {}",
+                "Warning".bold().yellow(),
+                ": definition".bold().bright_white(),
+                self.name().bold().green(),
+                "does not contain a COMMIT invocation".bold().bright_white()
+            )
+        }
+
+        if self.bang.contains("fish") {
             Command::new("fish")
                 .arg("-C")
                 .arg("bx init fish | source")
@@ -253,12 +301,24 @@ impl Definition {
         }
         else {
             let script = format!(
-                "source <(bx init posix)\n(\n{}\n)",
-                fs::read_to_string(&self.path)
-                    .context("Fault when reading in POSIX-based definition")?
+                "source <(bx init posix)\n(\n{script}\n)",
             );
+            
+            let shell = self
+                .bang
+                .trim_start_matches("#!")
+                // Whitespace after the shebang is valid.
+                .trim();
 
-            Command::new("sh")
+            if shell.is_empty() {
+                let err = eyre!("Shebang {} is invalid", &self.bang)
+                    .note( "Box could not determine the interpreter path.")
+                    .suggestion("Did you make a typo or forget a shebang?");
+
+                return Err(err)
+            };
+
+            Command::new(shell)
                 .arg("-c")
                 .arg(script)
                 .env(
@@ -428,7 +488,12 @@ impl Definition {
 
         if !Self::exists(&name)? {
             let err = eyre!("Definition {name} does not exist")
-                .note("Box checked the path {path:?}")
+                .suggestion(
+                    format!(
+                        "Box checked in {}",
+                        definition_directory()?.to_string_lossy()
+                    )
+                )                
                 .suggestion("Maybe create it first?");
 
             return Err(err);
@@ -464,7 +529,12 @@ impl Definition {
 
         if !Self::exists(&name)? {
             let err = eyre!("Definition {name} does not exist")
-                .note("Box checked the path {path:?}")
+                .suggestion(
+                    format!(
+                        "Box checked in {}",
+                        definition_directory()?.to_string_lossy()
+                    )
+                )
                 .suggestion("Maybe create it first?");
 
             return Err(err);
@@ -570,7 +640,10 @@ pub fn build_set(defs: &[String], all: bool, force: bool) -> Result<()> {
                     .into_iter()
                     .map(Result::unwrap_err)
                     .fold(eyre!("Failed to load and parse definition(s)"), |acc, err| {
-                        acc.section(err)
+                        let section = format!("{err:?}")
+                            .header("Sub-error:");
+
+                        acc.section(section)
                     });
     
                 return Err(err)
