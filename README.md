@@ -93,7 +93,30 @@ for my development containers.
 
 # Fedora Toolbox is my preferred base, but there are similar images
 # available for distributions like Debian and Arch.
+#
+# --pull=newer updates my local copy of the fedora-toolbox image if needed.
+# -v $HOME/.cache/dnf... mounts a shared, persistent DNF cache into the working container - 
+# good for recouping most of the speed loss from not using Containerfiles.
 FROM fedora-toolbox:latest
+
+# Set up DNF opts. The 'keepcache=true' in particular is critical for efficiency.
+for opt in "keepcache=True" "max_parallel_downloads=8" "fastestMirror=True"
+    RUN sh -c "echo $opt >> /etc/dnf/dnf.conf"
+end
+
+# Extract Chezmoi (dotfile manager) source state path.
+# Being able to do stuff like this "on the fly" is one of the advantages of using
+# shell to build containers.
+set chezmoi (chezmoi source-path | string split /)[5..]
+set chezmoi (string join / $chezmoi)
+
+# Install my preferred shell.
+RUN dnf install -y fish
+# Standard development tools.
+RUN dnf group install -y development-tools
+# Good to have a C/++ compiler on hand, regardless of current
+# toolchain.
+RUN dnf group install -y c-development
 
 # Copy my user into the container.
 PRESET cp-user
@@ -102,14 +125,14 @@ PRESET bind-fix
 # Mount the SSH agent socket into the container.
 PRESET ssh-agent
 
-# Copy my GNU Stow .dotfiles directory into the container.
-ADD --chown $USER:$USER -- $HOME/.dotfiles /home/$USER/.dotfiles
+# Copy my managed dotfiles and the associated Chezmoi binary into the container.
+ADD --chown $USER:$USER -- $HOME/$chezmoi /home/$USER/$chezmoi
+ADD --chown $USER:$USER -- $HOME/.config/chezmoi/chezmoi.toml /home/$USER/.config/chezmoi/chezmoi.toml
+ADD (which chezmoi) /usr/bin/chezmoi
 
-# Install some basics (preferred shell and editor, GNU Stow.)
-RUN sudo dnf install -y fish micro stow
-# Stow my basic dotfiles, as well as some container specific ones.
-RUN stow -d /home/$USER/.dotfiles --dotfiles common
-RUN stow -d /home/$USER/.dotfiles --dotfiles container
+# Bootstrap all my dotfiles.
+# This would also work with e.g. GNU Stow, YADM...
+RUN chezmoi apply --verbose
 
 # Set the working user to myself...
 USER    $USER
@@ -121,6 +144,12 @@ WORKDIR /home/$USER
 # You could also use a minimal `init` implementation, such as `tini`,
 # to ensure that zombie processes are reaped correctly.
 CMD     "sleep inf"
+
+# Mount my projects directory.
+CFG mount type=bind,src=$HOME/Documents/Projects,dst=/home/$USER/Projects 
+
+# Enable Podman's built-in tiny init for process reaping.
+CFG args --init
 
 # Commit the image.
 COMMIT localhost/base
@@ -134,18 +163,10 @@ COMMIT localhost/base
 
 FROM localhost/base
 
-ENV "CARGO_INSTALL_ROOT=/home/$USER/.cargo/install"
-
 RUN sh -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
 
-# Rust needs a C/++ toolchain for building foreign dependencies.
-RUN sudo dnf groupinstall -y "Development Tools"
-RUN sudo dnf groupinstall -y "C Development Tools and Libraries"
-
-# Mount my projects directory.
-CFG mount type=bind,src=$HOME/Documents/Projects,dst=/home/$USER/Projects
-
-# Commit the container, basing the name on the symlink used to invoke this definition.
+# Anything set in the 'base' image, including runtime options like mounts,
+# is inherited - so there isn't much to do here.
 COMMIT localhost/rust
 ```
 
