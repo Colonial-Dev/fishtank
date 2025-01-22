@@ -363,10 +363,7 @@ fn list_definitions() -> Result<()> {
         .iter()
         .map(|d| [
             d.name(),
-            if d.meta.containerfile {
-                "Containerfile"
-            }
-            else if d.bang.contains("fish") {
+            if d.bang.contains("fish") {
                 "Fish script"
             }
             else {

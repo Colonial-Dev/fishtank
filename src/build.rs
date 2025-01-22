@@ -10,7 +10,7 @@ use crate::CommandExt;
 
 pub type Definitions = Vec<Definition>;
 
-/// Represents a Box definition (script or Containerfile.)
+/// Represents a Box definition.
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Definition {
     /// The path to the definition.
@@ -33,9 +33,6 @@ pub struct Metadata {
     /// The name of any definitions this one depends on, if any.
     #[serde(default)]
     pub depends_on    : Vec<String>,
-    /// Whether or not this definition is an OCI Containerfile (default: false.)
-    #[serde(default)]
-    pub containerfile : bool,
 }
 
 impl Definition {
@@ -239,13 +236,8 @@ impl Definition {
             "...".bold().bright_white()
         );
 
-        if self.meta.containerfile {
-            self.build_containerfile()?;
-            return Ok(())
-        }
-
         let script = fs::read_to_string(&self.path)
-            .context("Fault when reading in shell-based definition")?;
+            .context("Fault when reading in definition")?;
 
         if !script.contains("FROM") {
             eprintln!(
@@ -349,51 +341,6 @@ impl Definition {
                 .context("Fault when evaluating POSIX-based definition")?;
         }
         
-        Ok(())
-    }
-
-    fn build_containerfile(&self) -> Result<()> {
-        let path = format!(
-            "box.path={}",
-            self.path.to_string_lossy()
-        );
-
-        let name = format!(
-            "box.name={}",
-            self.name()
-        );
-
-        let hash = format!(
-            "box.hash={:x}",
-            self.hash
-        );
-
-        let tree = format!(
-            "box.tree={:x}",
-            self.tree
-        );
-
-        Command::new("podman")
-            .args([
-                "build",
-                "--pull=newer",
-                "--annotation", "manager=box",
-            ])
-            .arg("--annotation")
-            .arg(&path)
-            .arg("--annotation")
-            .arg(&name)
-            .arg("--annotation")
-            .arg(hash)
-            .arg("--annotation")
-            .arg(tree)
-            .arg("--tag")
-            .arg(self.name())
-            .arg("--file")
-            .arg(&self.path)
-            .spawn_ok()
-            .context("Fault when evaluating Containerfile-based definition")?;
-
         Ok(())
     }
 

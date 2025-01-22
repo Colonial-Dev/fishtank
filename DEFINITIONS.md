@@ -10,12 +10,7 @@ All definitions can contain metadata as TOML key-value pairs with a special pref
 Metadata can be placed anywhere in the file. When Box evaluates a definition, each line of metadata is extracted and concatenated into a single TOML document; any intervening lines are ignored.
 
 Currently, only two keys are recognized:
-- `containerfile` (`boolean`) - determines if a definition should be interpreted as an OCI Containerfile. Defaults to `false.`
 - `depends_on` (`[string]`) - a list of definition names that this definition depends on. Defaults to empty.
-
-# Shell-Based Definitions
-
-These are the recommended way to write definitions for Box.
 
 ## Commands
 

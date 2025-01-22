@@ -14,13 +14,7 @@ Easily create and manage container environments for interactive use. All host in
     <img src=".github/demo.gif">
 </p>
 
-Bring your existing Docker-style container definitions...
-
-<p align="center">
-    <img src=".github/README_B.png">
-</p>
-
-... or take advantage of Box's custom shell-based format that bundles together all the information needed to build *and* run your containers.
+Take advantage of Box's custom shell-based image definition format that bundles together all the information needed to build *and* run your containers.
 
 <p align="center">
     <img src=".github/README_A.png">
@@ -48,9 +42,7 @@ Alternatively, statically-linked MUSL binaries are available in the [releases](h
 
 ## Getting Started
 
-Box requires a definition for each container you'd like to create. Definitions can be in two different formats:
-- Standard Container/Dockerfiles - just add `#~ containerfile = true` to the text and you're good to go.
-- Shell scripts (POSIX or `fish`) that run in a special harness. This injects additional functions and wraps a few others to provide additional functionality not present in Containerfiles, like the ability to declare runtime arguments such as mounts.
+Box requires a definition for each container you'd like to create. Definitions are shell scripts (POSIX or `fish`) that run in a special harness; this injects additional functions and wraps a few others to provide functionality not present in Containerfiles, like the ability to declare runtime arguments such as mounts.
 
 Either type must be stored with the file extension `.box` under one of:
 
@@ -64,7 +56,7 @@ To create and edit a new definition, you can simply run `bx create <NAME>`. This
 
 `bx edit <NAME>` can be used to alter existing definitions; both commands will use a temporary file for editing.
 
-Shell-based definitions run in the same directory as the definition, and should look something like the below. I use Fish, but the general structure
+Definitions run in the same directory as the definition, and should look something like the below. I use Fish, but the general structure
 readily translates to POSIX-compatible syntaxes.
 
 ```sh
@@ -78,7 +70,7 @@ RUN dnf install gcc
 COMMIT toolbox
 ```
 
-The harness for shell-based definitions provides several tools for setting up your container.
+The harness for definitions provides several tools for setting up your container.
 - All Containerfile directives like `RUN` and `ADD` are polyfilled as shell functions, and generally act the same as their real counterparts. 
   - (The most notable exception is pipes and redirections in `RUN` - you must wrap them in an `sh -c` to execute them wholly inside the working container.)
 - The `CFG` and `PRESET` directives, which let you:
@@ -88,7 +80,7 @@ The harness for shell-based definitions provides several tools for setting up yo
 
 Once you have a definition, run `bx build` to compile it into an OCI image, followed by `bx up` to create a container from the image.
 
-You can find exhaustive documentation and examples on shell-based definitions [here](https://github.com/Colonial-Dev/box/blob/master/DEFINITIONS.md).
+You can find exhaustive documentation and examples on definitions [here](https://github.com/Colonial-Dev/box/blob/master/DEFINITIONS.md).
 
 ___
 
@@ -194,7 +186,7 @@ As a Silverblue user, this tight coupling with my "pure" host always left a bad 
 
 > This is good for "soft" security against stuff like supply chain attacks; if (some day) I execute a `build.rs` that tries to hijack my session tokens or wipe my system - no big deal.
 
-Box also requires that every container be associated with a "definition," rather than defaulting to a standard "toolbox" image for each container. These can either be standard Containerfiles, or they can use Box's custom shell-based format to declare runtime arguments (like mounts) during build time.
+Box also requires that every container be associated with a "definition," rather than defaulting to a standard "toolbox" image for each container. These use Box's custom shell-based format to declare runtime arguments (like mounts) during build time.
 
 > I find this particularly advantageous for ensuring a consistent environment between my desktop and my laptop. It also makes for a good "lazy man's NixOS" on my Pi-hole server.
 
