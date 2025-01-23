@@ -9,8 +9,14 @@ All definitions can contain metadata as TOML key-value pairs with a special pref
 
 Metadata can be placed anywhere in the file. When Box evaluates a definition, each line of metadata is extracted and concatenated into a single TOML document; any intervening lines are ignored.
 
-Currently, only two keys are recognized:
+Currently, only one key is recognized:
 - `depends_on` (`[string]`) - a list of definition names that this definition depends on. Defaults to empty.
+
+## Build Laziness
+
+By default, Box only builds new and changed definitions to maximize efficiency, especially for those on slow or data-limited connections. This logic takes into account dependency trees; if `alpha` depends on `beta` and only `beta` is changed, both `alpha` and `beta` will be rebuilt.
+
+To override this behavior, pass the `-f`/`--force` flag to `bx build`.
 
 ## Commands
 
@@ -111,14 +117,14 @@ CFG <FUNCTION> [ARGS...]
 | `cap-add` | Add a Linux capability to the container. | See `man capabilities`. |
 | `cap-drop` | Remove a Linux capability from the container. | See `man capabilities`. |
 | `cpus` | Number of CPUs the container can utilize. | Self-explanatory. |
-| `memory` | Container memory limit. | Supports `b`, `kb`, `mb`, and `gb` as suffixes. |
+| `memory` | Container memory limit. | Supports `b`, `k`, `m`, and `g` as suffixes. |
 | `ulimit` | Set the `ulimit` parameters for the container. | See `man ulimit`. |
 | `device` | Add a host device to the container. Uses `--volume` syntax. | Self-explanatory. |
-| `userns` | Set the user namespace mode for the container. | [Podman docs](https://docs.podman.io/en/v4.4/markdown/options/userns.container.html) |
-| `security-opt` | Set a security option for the container. | [Podman docs](https://docs.podman.io/en/v4.6.1/markdown/options/security-opt.html) |
-| `mount` | Add a mount (`bind` or otherwise) to the container. Uses `--mount` syntax. | [Podman docs](https://docs.podman.io/en/v5.1.0/markdown/podman-create.1.html#mount-type-type-type-specific-option) |
-| `restart` | Set the container restart policy. | [Podman docs](https://docs.podman.io/en/v5.1.0/markdown/podman-create.1.html#restart-policy)
-| `secret` | Give the container access to a secret. | [Podman docs](https://docs.podman.io/en/v5.1.0/markdown/podman-create.1.html#secret-secret-opt-opt) |
+| `userns` | Set the user namespace mode for the container. | [Podman docs](https://docs.podman.io/en/stable/markdown/podman-create.1.html#userns-mode) |
+| `security-opt` | Set a security option for the container. | [Podman docs](https://docs.podman.io/en/stable/markdown/podman-create.1.html#security-opt-option) |
+| `mount` | Add a mount (`bind` or otherwise) to the container. Uses `--mount` syntax. | [Podman docs](https://docs.podman.io/en/stable/markdown/podman-create.1.html#mount-type-type-type-specific-option) |
+| `restart` | Set the container restart policy. | [Podman docs](https://docs.podman.io/en/stable/markdown/podman-create.1.html#restart-policy)
+| `secret` | Give the container access to a secret. | [Podman docs](https://docs.podman.io/en/stable/markdown/podman-create.1.html#secret-secret-opt-opt) |
 
 ### `PRESET`
 
@@ -171,5 +177,43 @@ trap cp
 ```
 
 This is not included in the POSIX harness, which automatically applies `set -eu` to abort on non-zero exit codes or uses of unset variables.
+
+## Additional Pointers
+
+### Persistent Package Manager Cache
+
+One of the big advantages of Containerfiles over `buildah`-based scripts is layer caching. Every statement in a Containerfile writes a new layer that can be cached and reused in future builds. This is *especially* useful when dealing with package manager calls, as it avoids wasting huge amounts of time and bandwidth when iterating on other details in the file.
+
+You can alleviate this by configuring a cache directory on your host that persists between builds. The below demonstrates how to accomplish this with DNF 5, but the same logic should easily transfer to your preferred package manager.
+
+```sh
+# Mount ~/.cache/dnf on my host into the standard DNF 5 cache directory in the container.
+FROM -v $HOME/.cache/dnf:/var/cache/libdnf5:z fedora-toolbox:latest
+# Prevent DNF from clobbering the cache by default.
+RUN sh -c "echo keepcache=True >> /etc/dnf/dnf.conf"
+# Install all your packages!
+```
+
+### Desktop Access
+
+You may want to execute graphical applications or access the system clipboard inside containers. This is actually quite simple to implement!
+
+For Wayland:
+
+```sh
+ENV WAYLAND_DISPLAY=wayland-0
+# You may want to change this if your user inside the container has a different UID.
+ENV XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR
+CFG mount type=bind,src=$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY,dst=$XDG_RUNTIME_DIR/wayland-0
+```
+
+For X11 - warning, untested as my setup does NOT like X:
+
+```sh
+ENV DISPLAY=$DISPLAY
+CFG mount type=bind,src=/tmp/.X11-unix,dst=/tmp/.X11-unix
+CFG args --ipc=host
+CFG device /dev/dri
+```
 
 [^1]: If you're wondering "how the hell does it do that" - it saves them as OCI annotations that are read back at creation time. <br> [Did you know you can just use the ASCII separator characters to separate things?](https://github.com/Colonial-Dev/box/blob/0c45cfe2c51a4ff1c3f62b3f753bcfeab882a56b/src/podman.rs#L341-L352) They're right there. Nobody can stop you.
