@@ -111,14 +111,14 @@ CFG <FUNCTION> [ARGS...]
 | `cap-add` | Add a Linux capability to the container. | See `man capabilities`. |
 | `cap-drop` | Remove a Linux capability from the container. | See `man capabilities`. |
 | `cpus` | Number of CPUs the container can utilize. | Self-explanatory. |
-| `memory` | Container memory limit. | Supports `b`, `kb`, `mb`, and `gb` as suffixes. |
+| `memory` | Container memory limit. | Supports `b`, `k`, `m`, and `g` as suffixes. |
 | `ulimit` | Set the `ulimit` parameters for the container. | See `man ulimit`. |
 | `device` | Add a host device to the container. Uses `--volume` syntax. | Self-explanatory. |
-| `userns` | Set the user namespace mode for the container. | [Podman docs](https://docs.podman.io/en/v4.4/markdown/options/userns.container.html) |
-| `security-opt` | Set a security option for the container. | [Podman docs](https://docs.podman.io/en/v4.6.1/markdown/options/security-opt.html) |
-| `mount` | Add a mount (`bind` or otherwise) to the container. Uses `--mount` syntax. | [Podman docs](https://docs.podman.io/en/v5.1.0/markdown/podman-create.1.html#mount-type-type-type-specific-option) |
-| `restart` | Set the container restart policy. | [Podman docs](https://docs.podman.io/en/v5.1.0/markdown/podman-create.1.html#restart-policy)
-| `secret` | Give the container access to a secret. | [Podman docs](https://docs.podman.io/en/v5.1.0/markdown/podman-create.1.html#secret-secret-opt-opt) |
+| `userns` | Set the user namespace mode for the container. | [Podman docs](https://docs.podman.io/en/stable/markdown/podman-create.1.html#userns-mode) |
+| `security-opt` | Set a security option for the container. | [Podman docs](https://docs.podman.io/en/stable/markdown/podman-create.1.html#security-opt-option) |
+| `mount` | Add a mount (`bind` or otherwise) to the container. Uses `--mount` syntax. | [Podman docs](https://docs.podman.io/en/stable/markdown/podman-create.1.html#mount-type-type-type-specific-option) |
+| `restart` | Set the container restart policy. | [Podman docs](https://docs.podman.io/en/stable/markdown/podman-create.1.html#restart-policy)
+| `secret` | Give the container access to a secret. | [Podman docs](https://docs.podman.io/en/stable/markdown/podman-create.1.html#secret-secret-opt-opt) |
 
 ### `PRESET`
 

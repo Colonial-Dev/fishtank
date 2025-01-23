@@ -209,17 +209,34 @@ As a Silverblue user, this tight coupling with my "pure" host always left a bad 
 
 Box also requires that every container be associated with a "definition," rather than defaulting to a standard "toolbox" image for each container. These use Box's custom shell-based format to declare runtime arguments (like mounts) during build time.
 
-> I find this particularly advantageous for ensuring a consistent environment between my desktop and my laptop. It also makes for a good "lazy man's NixOS" on my Pi-hole server.
+> I find this particularly advantageous for ensuring a consistent environment between my desktop and my laptop. It also makes for a good "lazy man's NixOS[^2]" on my Pi-hole server.
 
 So:
 - If you don't mind the above caveats and want containerized environments that Just Work with the host, use Toolbx or Distrobox.
 - If you *do* mind the above caveats and/or want some declarative-ness in your containers, give Box a try.
+
+### "Why use shell scripts for definitions?"
+
+Not only is shell a familiar environment that's easily extensible by external programs like Box, it also enables you to sprinkle logic into your definitions if needed.
+
+Consider this snippet that mounts all non-hidden `$HOME` directories into the container:
+
+```sh
+for dir in (ls -p $HOME | grep /)
+  CFG mount type=bind,src=(realpath $dir),dst=/home/$USER/$dir
+end
+```
+
+As far as I'm aware, doing something like this in the available declarative formats (`compose` et. al.) would be a tedious manual affair duplicated across every container that needs this behavior.
 
 ### "Why not just use Kubernetes YAML or `compose`?"
 A few reasons:
 
 1.  For Box's target use case of "bespoke interactive containers," separating the information on how to *build* the image from information on how to *run* it is [suboptimal](https://htmx.org/essays/locality-of-behaviour/).
 2. Kubernetes YAML is massively overcomplicated for what I wanted to do, and the `podman` version of `compose` was somewhat buggy when I tried it.
+    - I was made aware as I was finishing up Box that `docker-compose` now works "out of the box" with `podman`, so if that sounds like what you want - by all means, use that instead!
 3. YAML is... [yeah](https://github.com/Colonial-Dev/satpaper/blob/b2016c63ffeafc70538fd2b02fa60d1c077fd694/.github/workflows/release.yml#L1-L3).
 
 [^1]: Single Rust binary compiled from ~2000 lines of boring plumbing code. Red Hat and the OCI have already done all the heavy lifting here!
+
+[^2]: My apologies to any Nix fans in the audience, but my brain is too smooth to handle it.
